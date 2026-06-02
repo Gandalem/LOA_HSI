@@ -1,0 +1,29 @@
+{
+  "items": [
+    {
+      "key": "honor_shard",
+      "name": "명예의 파편 주머니/관련 아이템",
+      "item_id": 0
+    },
+    {
+      "key": "guardian_stone",
+      "name": "수호강석/상위 수호석",
+      "item_id": 0
+    },
+    {
+      "key": "destruction_stone",
+      "name": "파괴강석/상위 파괴석",
+      "item_id": 0
+    },
+    {
+      "key": "leapstone",
+      "name": "돌파석",
+      "item_id": 0
+    },
+    {
+      "key": "fusion_material",
+      "name": "융화 재료",
+      "item_id": 0
+    }
+  ]
+}

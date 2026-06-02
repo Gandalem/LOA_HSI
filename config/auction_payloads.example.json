@@ -1,0 +1,35 @@
+{
+  "accessory_base": {
+    "key": "accessory_base",
+    "name": "악세 기본 세팅비",
+    "payload": {
+      "CategoryCode": 200000,
+      "ItemTier": 4,
+      "ItemGrade": "고대",
+      "ItemGradeQuality": 80,
+      "PageNo": 1,
+      "Sort": "BUY_PRICE",
+      "SortCondition": "ASC",
+      "ItemName": "",
+      "SkillOptions": [],
+      "EtcOptions": []
+    },
+    "memo": "직업/빌드별 특성, 각인, 옵션 코드는 /api/options/auctions로 확인 후 SkillOptions/EtcOptions에 직접 넣으세요."
+  },
+  "ability_stone": {
+    "key": "ability_stone",
+    "name": "어빌리티 스톤 가격",
+    "payload": {
+      "CategoryCode": 0,
+      "ItemTier": 4,
+      "ItemGrade": "고대",
+      "PageNo": 1,
+      "Sort": "BUY_PRICE",
+      "SortCondition": "ASC",
+      "ItemName": "어빌리티 스톤",
+      "SkillOptions": [],
+      "EtcOptions": []
+    },
+    "memo": "CategoryCode는 서버의 /api/options/auctions 응답에서 어빌리티 스톤 카테고리 코드를 확인해 교체하세요."
+  }
+}

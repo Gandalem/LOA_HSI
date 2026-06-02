@@ -1,0 +1,44 @@
+{
+  "queries": [
+    {
+      "key": "ability_stone",
+      "name": "목표 어빌리티 스톤 최저가",
+      "price_mode": "min_buy_price",
+      "payload": {
+        "ItemLevelMin": 0,
+        "ItemLevelMax": 0,
+        "ItemGradeQuality": null,
+        "SkillOptions": [],
+        "EtcOptions": [],
+        "Sort": "BUY_PRICE",
+        "CategoryCode": 0,
+        "CharacterClass": "",
+        "ItemTier": 4,
+        "ItemGrade": "고대",
+        "ItemName": "",
+        "PageNo": 1,
+        "SortCondition": "ASC"
+      }
+    },
+    {
+      "key": "accessory_base",
+      "name": "목표 악세사리 세팅 최저가",
+      "price_mode": "min_buy_price",
+      "payload": {
+        "ItemLevelMin": 0,
+        "ItemLevelMax": 0,
+        "ItemGradeQuality": 80,
+        "SkillOptions": [],
+        "EtcOptions": [],
+        "Sort": "BUY_PRICE",
+        "CategoryCode": 0,
+        "CharacterClass": "",
+        "ItemTier": 4,
+        "ItemGrade": "고대",
+        "ItemName": "",
+        "PageNo": 1,
+        "SortCondition": "ASC"
+      }
+    }
+  ]
+}
