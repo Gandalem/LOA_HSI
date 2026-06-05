@@ -262,7 +262,7 @@ function App() {
     <main className="container">
       <header className="hero ekka-hero">
         <div>
-          <p className="eyebrow">LOA-HSI v41</p>
+          <p className="eyebrow">LOA-HSI v42</p>
           <h1>내가 접을 만했나? 로스트아크 성장 억까 리포트</h1>
           <p className="hero-copy">핵심 결론만 먼저 보여주고, 자세한 계산은 필요할 때 펼쳐보는 리포트입니다.</p>
         </div>
@@ -361,7 +361,7 @@ function App() {
           </div>
 
           <div className="form-grid memory-grid numeric-memory-grid v36-memory-grid">
-            <label>스톤 시도 개수<span><input type="number" min="0" step="1" value={memoryHints.stoneAttempts} onChange={(e) => setMemory('stoneAttempts', e.target.value)} placeholder="예: 120" /> 개</span></label>
+            <label>스톤 시도 개수<span><input type="number" min="0" step="1" value={memoryHints.stoneAttempts} onChange={(e) => setMemory('stoneAttempts', e.target.value)} placeholder="예: 120" /> 개</span><small>입력값이 매우 크면 “입력값이 사실이라면 극단적 억까”로 해석합니다.</small></label>
             <label>시뮬레이션 수<span><select value={simulationCount} onChange={(e) => setSimulationCount(e.target.value)}><option value="10000">1만 명</option><option value="100000">10만 명</option><option value="300000">30만 명</option></select></span></label>
             <label>100골드 원화 환산<span><input type="number" step="1" value={krwPer100Gold} onChange={(e) => setKrwPer100Gold(e.target.value)} /> 원</span></label>
           </div>
@@ -376,6 +376,7 @@ function App() {
         <details className="notice-panel footer-notice-panel">
           <summary>공지사항 / 업데이트 내역</summary>
           <div className="notice-list version-history-list">
+            <p><strong>v42</strong> 스톤 시도 수가 기대값을 크게 초과하면 “가능성 있음”이 아니라 강한/극단적 억까로 판정하도록 수정했습니다. 비정상적으로 큰 입력은 재확인 안내를 함께 표시합니다.</p>
             <p><strong>v41</strong> 장기백 입력에서 횟수와 시점 선택을 제거하고, 기록을 부위+강화구간 단위로 단순화했습니다. 강화 구간은 +11부터 현재 강화 단계까지 표시합니다.</p>
             <p><strong>v40</strong> 에기르 장비와 운명의 전율 장비의 재련표 라벨을 분리하고, 캐릭터 장비 이름 기준으로 재련표 구간을 자동 선택하도록 수정했습니다. 백엔드 준비 전 API 502가 보이는 문제를 줄이기 위해 재시도와 헬스체크를 추가했습니다.</p>
             <p><strong>v39</strong> 장기백 횟수 입력을 0~20회로 제한하고, 현재 캐릭터가 도달한 강화 구간만 선택지에 표시하도록 정리했습니다. 세부 분석은 결과 생성 시 기본 접힘 상태로 유지합니다.</p>

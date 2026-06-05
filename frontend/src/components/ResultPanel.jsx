@@ -48,7 +48,8 @@ function clamp(value, min, max) {
 function memoryNumber(value) {
   if (value === 'unknown' || value === '' || value === null || value === undefined) return null;
   const n = Number(value);
-  return Number.isNaN(n) ? null : n;
+  if (!Number.isFinite(n) || Number.isNaN(n) || n < 0) return null;
+  return Math.floor(n);
 }
 
 function moduleName(name) {
@@ -301,9 +302,14 @@ function attemptComparisonAnalysis({ actualAttempts, expectedAttempts, itemName 
   if (ratio < 1) {
     return { score: 0, offsetScore: 6, label: '기대보다 약간 적은 시도', detail: `기대 ${number(expectedAttempts)}${unit}보다 적게 끝난 기억입니다. 억까 단서가 아니라 약한 상쇄 단서입니다.`, ratio, direction: 'good' };
   }
-  if (ratio >= 3) return { score: 34, offsetScore: 0, label: '강한 초과 시도', detail: `기대값의 ${number(ratio, 1)}배 이상 시도한 기억입니다.`, ratio, direction: 'bad' };
-  if (ratio >= 2) return { score: 28, offsetScore: 0, label: '큰 초과 시도', detail: `기대값의 ${number(ratio, 1)}배 정도 시도한 기억입니다.`, ratio, direction: 'bad' };
-  if (ratio >= 1.4) return { score: 22, offsetScore: 0, label: '초과 시도', detail: `기대값보다 ${number((ratio - 1) * 100, 0)}% 정도 더 시도한 기억입니다.`, ratio, direction: 'bad' };
+  if (ratio >= 100) {
+    return { score: 100, offsetScore: 0, label: '극단적 억까', detail: `입력값이 매우 큽니다. 입력한 ${number(actualAttempts, 0)}${unit}가 사실이라면 기대값의 ${number(ratio, 1)}배 수준으로, 일반적인 확률 범위를 크게 벗어난 극단적 억까입니다.`, ratio, direction: 'bad', extreme: true, suspiciousInput: true };
+  }
+  if (ratio >= 10) return { score: 90, offsetScore: 0, label: '극단적 억까', detail: `기대값의 ${number(ratio, 1)}배 이상 시도한 기억입니다. 입력값이 사실이라면 이 항목만으로도 접을 만한 수준의 극단적 억까입니다.`, ratio, direction: 'bad', extreme: true };
+  if (ratio >= 5) return { score: 75, offsetScore: 0, label: '매우 강한 억까', detail: `기대값의 ${number(ratio, 1)}배 정도 시도한 기억입니다. 매우 강한 억까 단서로 봅니다.`, ratio, direction: 'bad' };
+  if (ratio >= 3) return { score: 58, offsetScore: 0, label: '강한 초과 시도', detail: `기대값의 ${number(ratio, 1)}배 이상 시도한 기억입니다. 강한 억까 단서로 봅니다.`, ratio, direction: 'bad' };
+  if (ratio >= 2) return { score: 42, offsetScore: 0, label: '큰 초과 시도', detail: `기대값의 ${number(ratio, 1)}배 정도 시도한 기억입니다. 억까 의심 단서로 봅니다.`, ratio, direction: 'bad' };
+  if (ratio >= 1.4) return { score: 28, offsetScore: 0, label: '초과 시도', detail: `기대값보다 ${number((ratio - 1) * 100, 0)}% 정도 더 시도한 기억입니다. 약한~중간 억까 단서로 봅니다.`, ratio, direction: 'bad' };
   return { score: 12, offsetScore: 0, label: '평균보다 약간 초과', detail: '기대값보다 조금 더 시도한 기억입니다.', ratio, direction: 'bad' };
 }
 
@@ -327,7 +333,7 @@ function buildMemoryReport(result, memoryHints = {}) {
   const equipment = clamp(equipmentAnalysis.score, 0, 42);
 
   const stoneAnalysis = attemptComparisonAnalysis({ actualAttempts: stoneAttempts, expectedAttempts: stoneExpected, itemName: '스톤 시도', unit: '개', enabled: stoneEnabled });
-  const stone = clamp(stoneAnalysis.score, 0, 38);
+  const stone = clamp(stoneAnalysis.score, 0, 100);
 
   const parts = [
     { key: 'equipment', name: '장비 재련', score: Math.round(equipment), kind: equipmentAnalysis.label, detail: equipmentAnalysis.detail },
@@ -364,7 +370,13 @@ function buildMemoryReport(result, memoryHints = {}) {
   let verdict = '억까 단서 약함';
   let tone = 'stable';
   let oneLine = '입력한 기억만 보면 접을 만큼의 억까라고 단정하기는 어렵습니다.';
-  if (total >= 70) {
+  if (stoneAnalysis.extreme || total >= 90) {
+    verdict = '극단적 억까';
+    tone = 'danger';
+    oneLine = stoneAnalysis.extreme
+      ? '어빌리티 스톤에서 극단적 초과 시도 단서가 감지되었습니다. 입력값이 사실이라면 이 구간만으로도 접을 만한 수준입니다.'
+      : '입력한 기억 기준으로 극단적인 억까 단서가 있습니다.';
+  } else if (total >= 70) {
     verdict = '접을 만했음';
     tone = 'danger';
     oneLine = '입력한 장기백 구간과 시도 수 기준으로 억까 체감이 매우 컸을 가능성이 높습니다.';
