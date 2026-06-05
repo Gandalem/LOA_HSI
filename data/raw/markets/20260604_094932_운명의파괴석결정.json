@@ -1,0 +1,18 @@
+{
+  "PageNo": 1,
+  "PageSize": 10,
+  "TotalCount": 1,
+  "Items": [
+    {
+      "CurrentMinPrice": 1540,
+      "Id": 66102007,
+      "Name": "운명의 파괴석 결정",
+      "Grade": "일반",
+      "Icon": "https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_13_249.png",
+      "BundleCount": 100,
+      "TradeRemainCount": null,
+      "YDayAvgPrice": 1535.8,
+      "RecentPrice": 1548
+    }
+  ]
+}

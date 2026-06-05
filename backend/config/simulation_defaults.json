@@ -1,0 +1,44 @@
+{
+  "notes": [
+    "MVP용 기본값입니다. 장비 재련 표는 icepeng/loa-calc의 src/app/refining/data.ts에서 T4 구간 일부를 옮겨온 참고용 표를 사용합니다.",
+    "재련 비용은 기본적으로 표의 골드 + 재료 수량 * material_prices_gold 값으로 계산합니다.",
+    "재료 가격은 실제 API 시세 연동 전까지 직접 조정해야 합니다.",
+    "장신구는 구매 시장가 요소로 처리하며, MVP에서는 확률 시뮬레이션이 아닌 고정 비용/분산 비용으로 모델링합니다."
+  ],
+  "equipment": {
+    "honing_table_file": "honing_tables_icepeng_t4.json",
+    "base_honing_level": 10,
+    "artisan_gain_default": 3.0,
+    "material_prices_gold": {
+      "운명의수호석": 1.2,
+      "운명의파괴석": 2.8,
+      "운명의수호석결정": 1.8,
+      "운명의파괴석결정": 4.0,
+      "운돌": 35,
+      "위운돌": 70,
+      "아비도스": 65,
+      "상급아비도스": 130,
+      "운명파편": 0.05,
+      "골드": 1
+    },
+    "fallback_attempt_rules": {
+      "16": {"success_rate": 0.10, "gold": 1200, "material_gold": 8000, "artisan_gain": 4.0},
+      "17": {"success_rate": 0.08, "gold": 1400, "material_gold": 9500, "artisan_gain": 3.5},
+      "18": {"success_rate": 0.06, "gold": 1800, "material_gold": 12000, "artisan_gain": 3.0},
+      "19": {"success_rate": 0.045, "gold": 2400, "material_gold": 16000, "artisan_gain": 2.7},
+      "20": {"success_rate": 0.035, "gold": 3200, "material_gold": 22000, "artisan_gain": 2.3},
+      "21": {"success_rate": 0.025, "gold": 4500, "material_gold": 32000, "artisan_gain": 1.9},
+      "22": {"success_rate": 0.015, "gold": 6000, "material_gold": 45000, "artisan_gain": 1.5}
+    }
+  },
+  "ability_stone": {
+    "default_stone_price_gold": 5000,
+    "facet_cost_gold": 0,
+    "max_stones_per_user": 10000,
+    "strategy": "positive_when_rate_ge_45_negative_otherwise"
+  },
+  "accessory": {
+    "default_accessory_total_gold": 300000,
+    "market_variance_sigma": 0.12
+  }
+}

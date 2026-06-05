@@ -1,0 +1,4633 @@
+{
+  "metadata": {
+    "title": "로스트아크 직업각인별 유효 특성·팔찌 옵션·연마 옵션 정리",
+    "language": "ko-KR",
+    "generated_at": "2026-06-05",
+    "game": "Lost Ark KR",
+    "basis": "T4/아크패시브 세팅 참고용 요약",
+    "caution": "패치, 밸런스 조정, 유저 빌드 변화에 따라 세팅은 달라질 수 있으므로 최종 세팅 전 최신 랭커/통계 확인 권장",
+    "source_urls": [
+      "https://loawa.com/stat/seal",
+      "https://iloa.gg/"
+    ],
+    "field_note": "valid_stats는 대표적으로 쓰이는 특성 조합이며, 직업/스킬트리/파티/보석/엘릭서/초각성 세팅에 따라 변동 가능"
+  },
+  "abbreviations": {
+    "치": "치명",
+    "특": "특화",
+    "신": "신속",
+    "D 연마": "딜러 장신구 연마 옵션",
+    "S 연마": "서포터 장신구 연마 옵션"
+  },
+  "common_options": {
+    "dealer_polish_options": {
+      "necklace": [
+        "추가 피해",
+        "적에게 주는 피해"
+      ],
+      "earring": [
+        "공격력",
+        "무기 공격력"
+      ],
+      "ring": [
+        "치명타 적중률",
+        "치명타 피해"
+      ]
+    },
+    "support_polish_options": {
+      "party_damage": [
+        "낙인력",
+        "아군 공격력 강화",
+        "아군 피해량 강화"
+      ],
+      "survival": [
+        "보호막 효과",
+        "회복 효과",
+        "최대 생명력"
+      ],
+      "stats": [
+        "신속",
+        "특화"
+      ]
+    },
+    "dealer_bracelet_options": {
+      "stats": [
+        "직업별 주특성",
+        "직업별 부특성"
+      ],
+      "common_special": [
+        "순환",
+        "우월",
+        "열정",
+        "정밀",
+        "습격"
+      ],
+      "combo": [
+        "쐐기",
+        "망치"
+      ],
+      "back_attack": [
+        "기습"
+      ],
+      "head_attack": [
+        "결투"
+      ]
+    },
+    "support_bracelet_options": {
+      "stats": [
+        "신속",
+        "특화"
+      ],
+      "party_synergy": [
+        "응원",
+        "비수",
+        "약점 노출"
+      ],
+      "utility": [
+        "깨달음",
+        "마나회수",
+        "최대 생명력"
+      ]
+    }
+  },
+  "records": [
+    {
+      "id": 1,
+      "class_group": "전사",
+      "class_name": "디스트로이어",
+      "engraving_name": "분노의 망치",
+      "role": "딜러",
+      "valid_stats": [
+        "치특"
+      ],
+      "bracelet_stats": [
+        "치명",
+        "특화"
+      ],
+      "bracelet_options": [
+        "결투",
+        "순환",
+        "우월",
+        "정밀"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "헤드어택",
+        "치명 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 2,
+      "class_group": "전사",
+      "class_name": "디스트로이어",
+      "engraving_name": "중력 수련",
+      "role": "딜러",
+      "valid_stats": [
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "결투",
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "헤드어택",
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 3,
+      "class_group": "전사",
+      "class_name": "워로드",
+      "engraving_name": "고독한 기사",
+      "role": "딜러",
+      "valid_stats": [
+        "치신",
+        "치특"
+      ],
+      "bracelet_stats": [
+        "치명",
+        "신속",
+        "특화"
+      ],
+      "bracelet_options": [
+        "결투",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "헤드어택"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 4,
+      "class_group": "전사",
+      "class_name": "워로드",
+      "engraving_name": "전투 태세",
+      "role": "딜러",
+      "valid_stats": [
+        "특신",
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "결투",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "헤드어택",
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 5,
+      "class_group": "전사",
+      "class_name": "버서커",
+      "engraving_name": "광전사의 비기",
+      "role": "딜러",
+      "valid_stats": [
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 6,
+      "class_group": "전사",
+      "class_name": "버서커",
+      "engraving_name": "광기",
+      "role": "딜러",
+      "valid_stats": [
+        "치신"
+      ],
+      "bracelet_stats": [
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "신속/치명 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 7,
+      "class_group": "전사",
+      "class_name": "홀리나이트",
+      "engraving_name": "축복의 오라",
+      "role": "서포터",
+      "valid_stats": [
+        "신특"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "특화"
+      ],
+      "bracelet_options": [
+        "응원",
+        "비수",
+        "약점 노출",
+        "깨달음",
+        "마나회수",
+        "최대 생명력"
+      ],
+      "polish_type": "S 연마",
+      "polish_options": {
+        "party_damage": [
+          "낙인력",
+          "아군 공격력 강화",
+          "아군 피해량 강화"
+        ],
+        "survival": [
+          "보호막 효과",
+          "회복 효과",
+          "최대 생명력"
+        ],
+        "stats": [
+          "신속",
+          "특화"
+        ]
+      },
+      "notes": [
+        "서포터"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 8,
+      "class_group": "전사",
+      "class_name": "홀리나이트",
+      "engraving_name": "심판자",
+      "role": "딜러",
+      "valid_stats": [
+        "신치",
+        "치신"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "정밀"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "딜홀나"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 9,
+      "class_group": "전사",
+      "class_name": "슬레이어",
+      "engraving_name": "처단자",
+      "role": "딜러",
+      "valid_stats": [
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "기습",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "백어택",
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 10,
+      "class_group": "전사",
+      "class_name": "슬레이어",
+      "engraving_name": "포식자",
+      "role": "딜러",
+      "valid_stats": [
+        "신치"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "기습",
+        "정밀",
+        "순환"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "백어택",
+        "신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 11,
+      "class_group": "전사",
+      "class_name": "발키리",
+      "engraving_name": "빛의 기사",
+      "role": "서포터",
+      "valid_stats": [
+        "신특"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "특화"
+      ],
+      "bracelet_options": [
+        "응원",
+        "비수",
+        "약점 노출",
+        "깨달음",
+        "마나회수",
+        "최대 생명력"
+      ],
+      "polish_type": "S 연마",
+      "polish_options": {
+        "party_damage": [
+          "낙인력",
+          "아군 공격력 강화",
+          "아군 피해량 강화"
+        ],
+        "survival": [
+          "보호막 효과",
+          "회복 효과",
+          "최대 생명력"
+        ],
+        "stats": [
+          "신속",
+          "특화"
+        ]
+      },
+      "notes": [
+        "서포터"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 12,
+      "class_group": "전사",
+      "class_name": "발키리",
+      "engraving_name": "해방자",
+      "role": "딜러",
+      "valid_stats": [
+        "특치",
+        "치신"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "정밀"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "딜러"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 13,
+      "class_group": "무도가",
+      "class_name": "배틀마스터",
+      "engraving_name": "초심",
+      "role": "딜러",
+      "valid_stats": [
+        "신치"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 14,
+      "class_group": "무도가",
+      "class_name": "배틀마스터",
+      "engraving_name": "오의 강화",
+      "role": "딜러",
+      "valid_stats": [
+        "특신",
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 15,
+      "class_group": "무도가",
+      "class_name": "인파이터",
+      "engraving_name": "극의: 체술",
+      "role": "딜러",
+      "valid_stats": [
+        "신치",
+        "치신"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "기습",
+        "정밀",
+        "순환"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "백어택",
+        "신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 16,
+      "class_group": "무도가",
+      "class_name": "인파이터",
+      "engraving_name": "충격 단련",
+      "role": "딜러",
+      "valid_stats": [
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "기습",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "백어택",
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 17,
+      "class_group": "무도가",
+      "class_name": "기공사",
+      "engraving_name": "세맥타통",
+      "role": "딜러",
+      "valid_stats": [
+        "신치",
+        "신특"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "치명",
+        "특화"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "정밀"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 18,
+      "class_group": "무도가",
+      "class_name": "기공사",
+      "engraving_name": "역천지체",
+      "role": "딜러",
+      "valid_stats": [
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 19,
+      "class_group": "무도가",
+      "class_name": "창술사",
+      "engraving_name": "절제",
+      "role": "딜러",
+      "valid_stats": [
+        "신치"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 20,
+      "class_group": "무도가",
+      "class_name": "창술사",
+      "engraving_name": "절정",
+      "role": "딜러",
+      "valid_stats": [
+        "특신",
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 21,
+      "class_group": "무도가",
+      "class_name": "스트라이커",
+      "engraving_name": "오의난무",
+      "role": "딜러",
+      "valid_stats": [
+        "특신",
+        "신특"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "신속"
+      ],
+      "bracelet_options": [
+        "기습",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "백어택"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 22,
+      "class_group": "무도가",
+      "class_name": "스트라이커",
+      "engraving_name": "일격필살",
+      "role": "딜러",
+      "valid_stats": [
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "기습",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "백어택",
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 23,
+      "class_group": "무도가",
+      "class_name": "브레이커",
+      "engraving_name": "수라의 길",
+      "role": "딜러",
+      "valid_stats": [
+        "치신",
+        "치특"
+      ],
+      "bracelet_stats": [
+        "치명",
+        "신속",
+        "특화"
+      ],
+      "bracelet_options": [
+        "결투",
+        "정밀",
+        "순환"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "헤드어택",
+        "치명 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 24,
+      "class_group": "무도가",
+      "class_name": "브레이커",
+      "engraving_name": "권왕파천무",
+      "role": "딜러",
+      "valid_stats": [
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "결투",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "헤드어택",
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 25,
+      "class_group": "헌터",
+      "class_name": "건슬링어",
+      "engraving_name": "피스메이커",
+      "role": "딜러",
+      "valid_stats": [
+        "치특신",
+        "특치"
+      ],
+      "bracelet_stats": [
+        "치명",
+        "특화",
+        "신속"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "다특성"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 26,
+      "class_group": "헌터",
+      "class_name": "건슬링어",
+      "engraving_name": "사냥의 시간",
+      "role": "딜러",
+      "valid_stats": [
+        "특치",
+        "치특"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화/치명 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 27,
+      "class_group": "헌터",
+      "class_name": "데빌헌터",
+      "engraving_name": "강화 무기",
+      "role": "딜러",
+      "valid_stats": [
+        "특치",
+        "치특"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "기습",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "백어택"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 28,
+      "class_group": "헌터",
+      "class_name": "데빌헌터",
+      "engraving_name": "핸드거너",
+      "role": "딜러",
+      "valid_stats": [
+        "특신",
+        "치신"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "비백어택 계열"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 29,
+      "class_group": "헌터",
+      "class_name": "블래스터",
+      "engraving_name": "화력 강화",
+      "role": "딜러",
+      "valid_stats": [
+        "치신"
+      ],
+      "bracelet_stats": [
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "치명/신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 30,
+      "class_group": "헌터",
+      "class_name": "블래스터",
+      "engraving_name": "포격 강화",
+      "role": "딜러",
+      "valid_stats": [
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 31,
+      "class_group": "헌터",
+      "class_name": "스카우터",
+      "engraving_name": "아르데타인의 기술",
+      "role": "딜러",
+      "valid_stats": [
+        "치신"
+      ],
+      "bracelet_stats": [
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "치명/신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 32,
+      "class_group": "헌터",
+      "class_name": "스카우터",
+      "engraving_name": "진화의 유산",
+      "role": "딜러",
+      "valid_stats": [
+        "특치",
+        "특신"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 33,
+      "class_group": "헌터",
+      "class_name": "호크아이",
+      "engraving_name": "죽음의 습격",
+      "role": "딜러",
+      "valid_stats": [
+        "치신",
+        "치특"
+      ],
+      "bracelet_stats": [
+        "치명",
+        "신속",
+        "특화"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "치명 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 34,
+      "class_group": "헌터",
+      "class_name": "호크아이",
+      "engraving_name": "두 번째 동료",
+      "role": "딜러",
+      "valid_stats": [
+        "신치",
+        "치신"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 35,
+      "class_group": "마법사",
+      "class_name": "바드",
+      "engraving_name": "절실한 구원",
+      "role": "서포터",
+      "valid_stats": [
+        "신특"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "특화"
+      ],
+      "bracelet_options": [
+        "응원",
+        "비수",
+        "약점 노출",
+        "깨달음",
+        "마나회수",
+        "최대 생명력"
+      ],
+      "polish_type": "S 연마",
+      "polish_options": {
+        "party_damage": [
+          "낙인력",
+          "아군 공격력 강화",
+          "아군 피해량 강화"
+        ],
+        "survival": [
+          "보호막 효과",
+          "회복 효과",
+          "최대 생명력"
+        ],
+        "stats": [
+          "신속",
+          "특화"
+        ]
+      },
+      "notes": [
+        "서포터"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 36,
+      "class_group": "마법사",
+      "class_name": "바드",
+      "engraving_name": "진실된 용맹",
+      "role": "딜러",
+      "valid_stats": [
+        "치신"
+      ],
+      "bracelet_stats": [
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "딜바드"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 37,
+      "class_group": "마법사",
+      "class_name": "서머너",
+      "engraving_name": "넘치는 교감",
+      "role": "딜러",
+      "valid_stats": [
+        "신치"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 38,
+      "class_group": "마법사",
+      "class_name": "서머너",
+      "engraving_name": "상급 소환사",
+      "role": "딜러",
+      "valid_stats": [
+        "특치",
+        "특신"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 39,
+      "class_group": "마법사",
+      "class_name": "소서리스",
+      "engraving_name": "점화",
+      "role": "딜러",
+      "valid_stats": [
+        "특치",
+        "특신"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 40,
+      "class_group": "마법사",
+      "class_name": "소서리스",
+      "engraving_name": "환류",
+      "role": "딜러",
+      "valid_stats": [
+        "치신",
+        "신치"
+      ],
+      "bracelet_stats": [
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "치명/신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 41,
+      "class_group": "마법사",
+      "class_name": "아르카나",
+      "engraving_name": "황후의 은총",
+      "role": "딜러",
+      "valid_stats": [
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "정밀"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 42,
+      "class_group": "마법사",
+      "class_name": "아르카나",
+      "engraving_name": "황제의 칙령",
+      "role": "딜러",
+      "valid_stats": [
+        "신치",
+        "치신"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 43,
+      "class_group": "암살자",
+      "class_name": "데모닉",
+      "engraving_name": "멈출 수 없는 충동",
+      "role": "딜러",
+      "valid_stats": [
+        "특치",
+        "특신"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 44,
+      "class_group": "암살자",
+      "class_name": "데모닉",
+      "engraving_name": "완벽한 억제",
+      "role": "딜러",
+      "valid_stats": [
+        "신치",
+        "치신"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 45,
+      "class_group": "암살자",
+      "class_name": "리퍼",
+      "engraving_name": "달의 소리",
+      "role": "딜러",
+      "valid_stats": [
+        "특신",
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "기습",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "백어택",
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 46,
+      "class_group": "암살자",
+      "class_name": "리퍼",
+      "engraving_name": "갈증",
+      "role": "딜러",
+      "valid_stats": [
+        "신특",
+        "신치"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "기습",
+        "정밀",
+        "순환"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "백어택",
+        "신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 47,
+      "class_group": "암살자",
+      "class_name": "블레이드",
+      "engraving_name": "잔재된 기운",
+      "role": "딜러",
+      "valid_stats": [
+        "특치",
+        "특신"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "기습",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "백어택",
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 48,
+      "class_group": "암살자",
+      "class_name": "블레이드",
+      "engraving_name": "버스트",
+      "role": "딜러",
+      "valid_stats": [
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "기습",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "백어택",
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 49,
+      "class_group": "암살자",
+      "class_name": "소울이터",
+      "engraving_name": "만월의 집행자",
+      "role": "딜러",
+      "valid_stats": [
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 50,
+      "class_group": "암살자",
+      "class_name": "소울이터",
+      "engraving_name": "그믐의 경계",
+      "role": "딜러",
+      "valid_stats": [
+        "치신",
+        "신치"
+      ],
+      "bracelet_stats": [
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "치명/신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 51,
+      "class_group": "스페셜리스트",
+      "class_name": "도화가",
+      "engraving_name": "만개",
+      "role": "서포터",
+      "valid_stats": [
+        "신특"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "특화"
+      ],
+      "bracelet_options": [
+        "응원",
+        "비수",
+        "약점 노출",
+        "깨달음",
+        "마나회수",
+        "최대 생명력"
+      ],
+      "polish_type": "S 연마",
+      "polish_options": {
+        "party_damage": [
+          "낙인력",
+          "아군 공격력 강화",
+          "아군 피해량 강화"
+        ],
+        "survival": [
+          "보호막 효과",
+          "회복 효과",
+          "최대 생명력"
+        ],
+        "stats": [
+          "신속",
+          "특화"
+        ]
+      },
+      "notes": [
+        "서포터"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 52,
+      "class_group": "스페셜리스트",
+      "class_name": "도화가",
+      "engraving_name": "회귀",
+      "role": "딜러",
+      "valid_stats": [
+        "치신"
+      ],
+      "bracelet_stats": [
+        "치명",
+        "신속"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "딜도화가"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 53,
+      "class_group": "스페셜리스트",
+      "class_name": "기상술사",
+      "engraving_name": "이슬비",
+      "role": "딜러",
+      "valid_stats": [
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "치명"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 54,
+      "class_group": "스페셜리스트",
+      "class_name": "기상술사",
+      "engraving_name": "질풍노도",
+      "role": "딜러",
+      "valid_stats": [
+        "신치",
+        "치신"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "신속 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 55,
+      "class_group": "스페셜리스트",
+      "class_name": "환수사",
+      "engraving_name": "환수 각성",
+      "role": "딜러",
+      "valid_stats": [
+        "특신",
+        "특치"
+      ],
+      "bracelet_stats": [
+        "특화",
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "순환",
+        "우월",
+        "열정"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "특화 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    },
+    {
+      "id": 56,
+      "class_group": "스페셜리스트",
+      "class_name": "환수사",
+      "engraving_name": "야성",
+      "role": "딜러",
+      "valid_stats": [
+        "신치",
+        "치신"
+      ],
+      "bracelet_stats": [
+        "신속",
+        "치명"
+      ],
+      "bracelet_options": [
+        "정밀",
+        "순환",
+        "우월"
+      ],
+      "polish_type": "D 연마",
+      "polish_options": {
+        "necklace": [
+          "추가 피해",
+          "적에게 주는 피해"
+        ],
+        "earring": [
+          "공격력",
+          "무기 공격력"
+        ],
+        "ring": [
+          "치명타 적중률",
+          "치명타 피해"
+        ]
+      },
+      "notes": [
+        "신속/치명 기반"
+      ],
+      "source_urls": [
+        "https://loawa.com/stat/seal",
+        "https://iloa.gg/"
+      ]
+    }
+  ],
+  "classes": [
+    {
+      "class_group": "전사",
+      "class_name": "디스트로이어",
+      "engravings": [
+        {
+          "engraving_name": "분노의 망치",
+          "role": "딜러",
+          "valid_stats": [
+            "치특"
+          ],
+          "bracelet_stats": [
+            "치명",
+            "특화"
+          ],
+          "bracelet_options": [
+            "결투",
+            "순환",
+            "우월",
+            "정밀"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "헤드어택",
+            "치명 기반"
+          ]
+        },
+        {
+          "engraving_name": "중력 수련",
+          "role": "딜러",
+          "valid_stats": [
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "결투",
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "헤드어택",
+            "특화 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "전사",
+      "class_name": "워로드",
+      "engravings": [
+        {
+          "engraving_name": "고독한 기사",
+          "role": "딜러",
+          "valid_stats": [
+            "치신",
+            "치특"
+          ],
+          "bracelet_stats": [
+            "치명",
+            "신속",
+            "특화"
+          ],
+          "bracelet_options": [
+            "결투",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "헤드어택"
+          ]
+        },
+        {
+          "engraving_name": "전투 태세",
+          "role": "딜러",
+          "valid_stats": [
+            "특신",
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "결투",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "헤드어택",
+            "특화 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "전사",
+      "class_name": "버서커",
+      "engravings": [
+        {
+          "engraving_name": "광전사의 비기",
+          "role": "딜러",
+          "valid_stats": [
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        },
+        {
+          "engraving_name": "광기",
+          "role": "딜러",
+          "valid_stats": [
+            "치신"
+          ],
+          "bracelet_stats": [
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "신속/치명 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "전사",
+      "class_name": "홀리나이트",
+      "engravings": [
+        {
+          "engraving_name": "축복의 오라",
+          "role": "서포터",
+          "valid_stats": [
+            "신특"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "특화"
+          ],
+          "bracelet_options": [
+            "응원",
+            "비수",
+            "약점 노출",
+            "깨달음",
+            "마나회수",
+            "최대 생명력"
+          ],
+          "polish_type": "S 연마",
+          "polish_options": {
+            "party_damage": [
+              "낙인력",
+              "아군 공격력 강화",
+              "아군 피해량 강화"
+            ],
+            "survival": [
+              "보호막 효과",
+              "회복 효과",
+              "최대 생명력"
+            ],
+            "stats": [
+              "신속",
+              "특화"
+            ]
+          },
+          "notes": [
+            "서포터"
+          ]
+        },
+        {
+          "engraving_name": "심판자",
+          "role": "딜러",
+          "valid_stats": [
+            "신치",
+            "치신"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "정밀"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "딜홀나"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "전사",
+      "class_name": "슬레이어",
+      "engravings": [
+        {
+          "engraving_name": "처단자",
+          "role": "딜러",
+          "valid_stats": [
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "기습",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "백어택",
+            "특화 기반"
+          ]
+        },
+        {
+          "engraving_name": "포식자",
+          "role": "딜러",
+          "valid_stats": [
+            "신치"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "기습",
+            "정밀",
+            "순환"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "백어택",
+            "신속 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "전사",
+      "class_name": "발키리",
+      "engravings": [
+        {
+          "engraving_name": "빛의 기사",
+          "role": "서포터",
+          "valid_stats": [
+            "신특"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "특화"
+          ],
+          "bracelet_options": [
+            "응원",
+            "비수",
+            "약점 노출",
+            "깨달음",
+            "마나회수",
+            "최대 생명력"
+          ],
+          "polish_type": "S 연마",
+          "polish_options": {
+            "party_damage": [
+              "낙인력",
+              "아군 공격력 강화",
+              "아군 피해량 강화"
+            ],
+            "survival": [
+              "보호막 효과",
+              "회복 효과",
+              "최대 생명력"
+            ],
+            "stats": [
+              "신속",
+              "특화"
+            ]
+          },
+          "notes": [
+            "서포터"
+          ]
+        },
+        {
+          "engraving_name": "해방자",
+          "role": "딜러",
+          "valid_stats": [
+            "특치",
+            "치신"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "정밀"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "딜러"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "무도가",
+      "class_name": "배틀마스터",
+      "engravings": [
+        {
+          "engraving_name": "초심",
+          "role": "딜러",
+          "valid_stats": [
+            "신치"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "신속 기반"
+          ]
+        },
+        {
+          "engraving_name": "오의 강화",
+          "role": "딜러",
+          "valid_stats": [
+            "특신",
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "무도가",
+      "class_name": "인파이터",
+      "engravings": [
+        {
+          "engraving_name": "극의: 체술",
+          "role": "딜러",
+          "valid_stats": [
+            "신치",
+            "치신"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "기습",
+            "정밀",
+            "순환"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "백어택",
+            "신속 기반"
+          ]
+        },
+        {
+          "engraving_name": "충격 단련",
+          "role": "딜러",
+          "valid_stats": [
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "기습",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "백어택",
+            "특화 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "무도가",
+      "class_name": "기공사",
+      "engravings": [
+        {
+          "engraving_name": "세맥타통",
+          "role": "딜러",
+          "valid_stats": [
+            "신치",
+            "신특"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "치명",
+            "특화"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "정밀"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "신속 기반"
+          ]
+        },
+        {
+          "engraving_name": "역천지체",
+          "role": "딜러",
+          "valid_stats": [
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "무도가",
+      "class_name": "창술사",
+      "engravings": [
+        {
+          "engraving_name": "절제",
+          "role": "딜러",
+          "valid_stats": [
+            "신치"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "신속 기반"
+          ]
+        },
+        {
+          "engraving_name": "절정",
+          "role": "딜러",
+          "valid_stats": [
+            "특신",
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "무도가",
+      "class_name": "스트라이커",
+      "engravings": [
+        {
+          "engraving_name": "오의난무",
+          "role": "딜러",
+          "valid_stats": [
+            "특신",
+            "신특"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "신속"
+          ],
+          "bracelet_options": [
+            "기습",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "백어택"
+          ]
+        },
+        {
+          "engraving_name": "일격필살",
+          "role": "딜러",
+          "valid_stats": [
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "기습",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "백어택",
+            "특화 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "무도가",
+      "class_name": "브레이커",
+      "engravings": [
+        {
+          "engraving_name": "수라의 길",
+          "role": "딜러",
+          "valid_stats": [
+            "치신",
+            "치특"
+          ],
+          "bracelet_stats": [
+            "치명",
+            "신속",
+            "특화"
+          ],
+          "bracelet_options": [
+            "결투",
+            "정밀",
+            "순환"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "헤드어택",
+            "치명 기반"
+          ]
+        },
+        {
+          "engraving_name": "권왕파천무",
+          "role": "딜러",
+          "valid_stats": [
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "결투",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "헤드어택",
+            "특화 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "헌터",
+      "class_name": "건슬링어",
+      "engravings": [
+        {
+          "engraving_name": "피스메이커",
+          "role": "딜러",
+          "valid_stats": [
+            "치특신",
+            "특치"
+          ],
+          "bracelet_stats": [
+            "치명",
+            "특화",
+            "신속"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "다특성"
+          ]
+        },
+        {
+          "engraving_name": "사냥의 시간",
+          "role": "딜러",
+          "valid_stats": [
+            "특치",
+            "치특"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화/치명 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "헌터",
+      "class_name": "데빌헌터",
+      "engravings": [
+        {
+          "engraving_name": "강화 무기",
+          "role": "딜러",
+          "valid_stats": [
+            "특치",
+            "치특"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "기습",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "백어택"
+          ]
+        },
+        {
+          "engraving_name": "핸드거너",
+          "role": "딜러",
+          "valid_stats": [
+            "특신",
+            "치신"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "비백어택 계열"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "헌터",
+      "class_name": "블래스터",
+      "engravings": [
+        {
+          "engraving_name": "화력 강화",
+          "role": "딜러",
+          "valid_stats": [
+            "치신"
+          ],
+          "bracelet_stats": [
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "치명/신속 기반"
+          ]
+        },
+        {
+          "engraving_name": "포격 강화",
+          "role": "딜러",
+          "valid_stats": [
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "헌터",
+      "class_name": "스카우터",
+      "engravings": [
+        {
+          "engraving_name": "아르데타인의 기술",
+          "role": "딜러",
+          "valid_stats": [
+            "치신"
+          ],
+          "bracelet_stats": [
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "치명/신속 기반"
+          ]
+        },
+        {
+          "engraving_name": "진화의 유산",
+          "role": "딜러",
+          "valid_stats": [
+            "특치",
+            "특신"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "헌터",
+      "class_name": "호크아이",
+      "engravings": [
+        {
+          "engraving_name": "죽음의 습격",
+          "role": "딜러",
+          "valid_stats": [
+            "치신",
+            "치특"
+          ],
+          "bracelet_stats": [
+            "치명",
+            "신속",
+            "특화"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "치명 기반"
+          ]
+        },
+        {
+          "engraving_name": "두 번째 동료",
+          "role": "딜러",
+          "valid_stats": [
+            "신치",
+            "치신"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "신속 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "마법사",
+      "class_name": "바드",
+      "engravings": [
+        {
+          "engraving_name": "절실한 구원",
+          "role": "서포터",
+          "valid_stats": [
+            "신특"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "특화"
+          ],
+          "bracelet_options": [
+            "응원",
+            "비수",
+            "약점 노출",
+            "깨달음",
+            "마나회수",
+            "최대 생명력"
+          ],
+          "polish_type": "S 연마",
+          "polish_options": {
+            "party_damage": [
+              "낙인력",
+              "아군 공격력 강화",
+              "아군 피해량 강화"
+            ],
+            "survival": [
+              "보호막 효과",
+              "회복 효과",
+              "최대 생명력"
+            ],
+            "stats": [
+              "신속",
+              "특화"
+            ]
+          },
+          "notes": [
+            "서포터"
+          ]
+        },
+        {
+          "engraving_name": "진실된 용맹",
+          "role": "딜러",
+          "valid_stats": [
+            "치신"
+          ],
+          "bracelet_stats": [
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "딜바드"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "마법사",
+      "class_name": "서머너",
+      "engravings": [
+        {
+          "engraving_name": "넘치는 교감",
+          "role": "딜러",
+          "valid_stats": [
+            "신치"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "신속 기반"
+          ]
+        },
+        {
+          "engraving_name": "상급 소환사",
+          "role": "딜러",
+          "valid_stats": [
+            "특치",
+            "특신"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "마법사",
+      "class_name": "소서리스",
+      "engravings": [
+        {
+          "engraving_name": "점화",
+          "role": "딜러",
+          "valid_stats": [
+            "특치",
+            "특신"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        },
+        {
+          "engraving_name": "환류",
+          "role": "딜러",
+          "valid_stats": [
+            "치신",
+            "신치"
+          ],
+          "bracelet_stats": [
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "치명/신속 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "마법사",
+      "class_name": "아르카나",
+      "engravings": [
+        {
+          "engraving_name": "황후의 은총",
+          "role": "딜러",
+          "valid_stats": [
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "정밀"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        },
+        {
+          "engraving_name": "황제의 칙령",
+          "role": "딜러",
+          "valid_stats": [
+            "신치",
+            "치신"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "신속 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "암살자",
+      "class_name": "데모닉",
+      "engravings": [
+        {
+          "engraving_name": "멈출 수 없는 충동",
+          "role": "딜러",
+          "valid_stats": [
+            "특치",
+            "특신"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        },
+        {
+          "engraving_name": "완벽한 억제",
+          "role": "딜러",
+          "valid_stats": [
+            "신치",
+            "치신"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "신속 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "암살자",
+      "class_name": "리퍼",
+      "engravings": [
+        {
+          "engraving_name": "달의 소리",
+          "role": "딜러",
+          "valid_stats": [
+            "특신",
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "기습",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "백어택",
+            "특화 기반"
+          ]
+        },
+        {
+          "engraving_name": "갈증",
+          "role": "딜러",
+          "valid_stats": [
+            "신특",
+            "신치"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "기습",
+            "정밀",
+            "순환"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "백어택",
+            "신속 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "암살자",
+      "class_name": "블레이드",
+      "engravings": [
+        {
+          "engraving_name": "잔재된 기운",
+          "role": "딜러",
+          "valid_stats": [
+            "특치",
+            "특신"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "기습",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "백어택",
+            "특화 기반"
+          ]
+        },
+        {
+          "engraving_name": "버스트",
+          "role": "딜러",
+          "valid_stats": [
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "기습",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "백어택",
+            "특화 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "암살자",
+      "class_name": "소울이터",
+      "engravings": [
+        {
+          "engraving_name": "만월의 집행자",
+          "role": "딜러",
+          "valid_stats": [
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        },
+        {
+          "engraving_name": "그믐의 경계",
+          "role": "딜러",
+          "valid_stats": [
+            "치신",
+            "신치"
+          ],
+          "bracelet_stats": [
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "치명/신속 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "스페셜리스트",
+      "class_name": "도화가",
+      "engravings": [
+        {
+          "engraving_name": "만개",
+          "role": "서포터",
+          "valid_stats": [
+            "신특"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "특화"
+          ],
+          "bracelet_options": [
+            "응원",
+            "비수",
+            "약점 노출",
+            "깨달음",
+            "마나회수",
+            "최대 생명력"
+          ],
+          "polish_type": "S 연마",
+          "polish_options": {
+            "party_damage": [
+              "낙인력",
+              "아군 공격력 강화",
+              "아군 피해량 강화"
+            ],
+            "survival": [
+              "보호막 효과",
+              "회복 효과",
+              "최대 생명력"
+            ],
+            "stats": [
+              "신속",
+              "특화"
+            ]
+          },
+          "notes": [
+            "서포터"
+          ]
+        },
+        {
+          "engraving_name": "회귀",
+          "role": "딜러",
+          "valid_stats": [
+            "치신"
+          ],
+          "bracelet_stats": [
+            "치명",
+            "신속"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "딜도화가"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "스페셜리스트",
+      "class_name": "기상술사",
+      "engravings": [
+        {
+          "engraving_name": "이슬비",
+          "role": "딜러",
+          "valid_stats": [
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "치명"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        },
+        {
+          "engraving_name": "질풍노도",
+          "role": "딜러",
+          "valid_stats": [
+            "신치",
+            "치신"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "신속 기반"
+          ]
+        }
+      ]
+    },
+    {
+      "class_group": "스페셜리스트",
+      "class_name": "환수사",
+      "engravings": [
+        {
+          "engraving_name": "환수 각성",
+          "role": "딜러",
+          "valid_stats": [
+            "특신",
+            "특치"
+          ],
+          "bracelet_stats": [
+            "특화",
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "순환",
+            "우월",
+            "열정"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "특화 기반"
+          ]
+        },
+        {
+          "engraving_name": "야성",
+          "role": "딜러",
+          "valid_stats": [
+            "신치",
+            "치신"
+          ],
+          "bracelet_stats": [
+            "신속",
+            "치명"
+          ],
+          "bracelet_options": [
+            "정밀",
+            "순환",
+            "우월"
+          ],
+          "polish_type": "D 연마",
+          "polish_options": {
+            "necklace": [
+              "추가 피해",
+              "적에게 주는 피해"
+            ],
+            "earring": [
+              "공격력",
+              "무기 공격력"
+            ],
+            "ring": [
+              "치명타 적중률",
+              "치명타 피해"
+            ]
+          },
+          "notes": [
+            "신속/치명 기반"
+          ]
+        }
+      ]
+    }
+  ]
+}

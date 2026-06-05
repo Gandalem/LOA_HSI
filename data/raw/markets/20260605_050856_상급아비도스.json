@@ -1,0 +1,18 @@
+{
+  "PageNo": 1,
+  "PageSize": 10,
+  "TotalCount": 1,
+  "Items": [
+    {
+      "CurrentMinPrice": 158,
+      "Id": 6861013,
+      "Name": "상급 아비도스 융화 재료",
+      "Grade": "영웅",
+      "Icon": "https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_13_252.png",
+      "BundleCount": 1,
+      "TradeRemainCount": null,
+      "YDayAvgPrice": 158.5,
+      "RecentPrice": 158
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "PageNo": 1,
+  "PageSize": 10,
+  "TotalCount": 1,
+  "Items": [
+    {
+      "CurrentMinPrice": 72,
+      "Id": 66130141,
+      "Name": "운명의 파편 주머니(소)",
+      "Grade": "고급",
+      "Icon": "https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_12_91.png",
+      "BundleCount": 1,
+      "TradeRemainCount": null,
+      "YDayAvgPrice": 79.5,
+      "RecentPrice": 82
+    }
+  ]
+}

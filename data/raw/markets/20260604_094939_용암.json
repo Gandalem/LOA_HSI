@@ -1,0 +1,18 @@
+{
+  "PageNo": 1,
+  "PageSize": 10,
+  "TotalCount": 1,
+  "Items": [
+    {
+      "CurrentMinPrice": 455,
+      "Id": 66111131,
+      "Name": "용암의 숨결",
+      "Grade": "영웅",
+      "Icon": "https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_12_171.png",
+      "BundleCount": 1,
+      "TradeRemainCount": null,
+      "YDayAvgPrice": 463.9,
+      "RecentPrice": 456
+    }
+  ]
+}

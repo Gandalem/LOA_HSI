@@ -1,0 +1,103 @@
+{
+  "notes": [
+    "로스트아크 거래소 API로 재련 재료 가격을 수집하기 위한 기본 설정입니다.",
+    "itemId를 알고 있으면 itemId를 넣으면 더 정확합니다. itemId가 0 또는 null이면 ItemName 검색으로 수집합니다.",
+    "CurrentMinPrice는 BundleCount 단위 가격일 수 있어 divideByBundleCount=true일 때 1개당 가격으로 환산합니다.",
+    "운명파편은 실제 거래 아이템이 주머니 단위일 수 있으므로 프로젝트 기준에 맞게 searchName, itemId, priceDivisor를 검증하세요.",
+    "v25: T4 보조재료 빙하의 숨결(방어구), 용암의 숨결(무기)을 거래소 시세 수집 대상에 추가했습니다.",
+    "v26: CurrentMinPrice가 묶음 가격이면 BundleCount로 나누어 1개 단가로 환산하고, 후보가 여러 개면 정확한 이름 매칭 및 1개 단가가 낮은 항목을 우선 사용합니다.",
+    "v27: 보조재료 최적화는 제거했습니다. 운명의 파편은 주머니 가격을 1000으로 나누어 1개 단가로 환산합니다."
+  ],
+  "items": [
+    {
+      "key": "운명의수호석",
+      "name": "운명의 수호석",
+      "searchName": "운명의 수호석",
+      "itemId": 0,
+      "categoryCode": 50000,
+      "divideByBundleCount": true,
+      "priceDivisor": 1,
+      "enabled": true
+    },
+    {
+      "key": "운명의파괴석",
+      "name": "운명의 파괴석",
+      "searchName": "운명의 파괴석",
+      "itemId": 0,
+      "categoryCode": 50000,
+      "divideByBundleCount": true,
+      "priceDivisor": 1,
+      "enabled": true
+    },
+    {
+      "key": "운명의수호석결정",
+      "name": "운명의 수호석 결정",
+      "searchName": "운명의 수호석 결정",
+      "itemId": 0,
+      "categoryCode": 50000,
+      "divideByBundleCount": true,
+      "priceDivisor": 1,
+      "enabled": true
+    },
+    {
+      "key": "운명의파괴석결정",
+      "name": "운명의 파괴석 결정",
+      "searchName": "운명의 파괴석 결정",
+      "itemId": 0,
+      "categoryCode": 50000,
+      "divideByBundleCount": true,
+      "priceDivisor": 1,
+      "enabled": true
+    },
+    {
+      "key": "운돌",
+      "name": "운명의 돌파석",
+      "searchName": "운명의 돌파석",
+      "itemId": 0,
+      "categoryCode": 50000,
+      "divideByBundleCount": true,
+      "priceDivisor": 1,
+      "enabled": true
+    },
+    {
+      "key": "위운돌",
+      "name": "위대한 운명의 돌파석",
+      "searchName": "위대한 운명의 돌파석",
+      "itemId": 0,
+      "categoryCode": 50000,
+      "divideByBundleCount": true,
+      "priceDivisor": 1,
+      "enabled": true
+    },
+    {
+      "key": "아비도스",
+      "name": "아비도스 융화 재료",
+      "searchName": "아비도스 융화 재료",
+      "itemId": 0,
+      "categoryCode": 50000,
+      "divideByBundleCount": true,
+      "priceDivisor": 1,
+      "enabled": true
+    },
+    {
+      "key": "상급아비도스",
+      "name": "상급 아비도스 융화 재료",
+      "searchName": "상급 아비도스 융화 재료",
+      "itemId": 0,
+      "categoryCode": 50000,
+      "divideByBundleCount": true,
+      "priceDivisor": 1,
+      "enabled": true
+    },
+    {
+      "key": "운명파편",
+      "name": "운명의 파편",
+      "searchName": "운명의 파편 주머니(소)",
+      "itemId": 0,
+      "categoryCode": 50000,
+      "divideByBundleCount": false,
+      "priceDivisor": 1000,
+      "enabled": true
+    }
+  ]
+}

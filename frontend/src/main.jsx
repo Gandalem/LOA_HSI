@@ -1,801 +1,424 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import axios from 'axios';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from 'recharts';
-import './style.css';
-
-const API_BASE = import.meta.env.VITE_API_BASE || '';
-
-const LOSTARK_CLASSES = [
-  '버서커', '디스트로이어', '워로드', '홀리나이트', '슬레이어',
-  '배틀마스터', '인파이터', '기공사', '창술사', '스트라이커', '브레이커',
-  '데빌헌터', '블래스터', '호크아이', '스카우터', '건슬링어',
-  '바드', '서머너', '아르카나', '소서리스',
-  '데모닉', '블레이드', '리퍼', '소울이터',
-  '도화가', '기상술사',
-];
-
-const CLASS_ENGRAVINGS = {
-  버서커: ['광전사의 비기', '광기'],
-  디스트로이어: ['분노의 망치', '중력 수련'],
-  워로드: ['고독한 기사', '전투 태세'],
-  홀리나이트: ['축복의 오라', '심판자'],
-  슬레이어: ['처단자', '포식자'],
-  배틀마스터: ['초심', '오의 강화'],
-  인파이터: ['극의: 체술', '충격 단련'],
-  기공사: ['세맥타통', '역천지체'],
-  창술사: ['절정', '절제'],
-  스트라이커: ['오의난무', '일격필살'],
-  브레이커: ['권왕파천무', '수라의 길'],
-  데빌헌터: ['강화 무기', '핸드거너'],
-  블래스터: ['포격 강화', '화력 강화'],
-  호크아이: ['두 번째 동료', '죽음의 습격'],
-  스카우터: ['진화의 유산', '아르데타인의 기술'],
-  건슬링어: ['피스메이커', '사냥의 시간'],
-  바드: ['절실한 구원', '진실된 용맹'],
-  서머너: ['상급 소환사', '넘치는 교감'],
-  아르카나: ['황후의 은총', '황제의 칙령'],
-  소서리스: ['점화', '환류'],
-  데모닉: ['멈출 수 없는 충동', '완벽한 억제'],
-  블레이드: ['잔재된 기운', '버스트'],
-  리퍼: ['달의 소리', '갈증'],
-  소울이터: ['만월의 집행자', '그믐의 경계'],
-  도화가: ['만개', '회귀'],
-  기상술사: ['질풍노도', '이슬비'],
-};
-
-const SUPPORT_CLASSES = new Set(['바드', '도화가', '홀리나이트']);
-
-const COMMON_STONE_ENGRAVINGS = [
-  '원한', '예리한 둔기', '저주받은 인형', '아드레날린', '돌격대장', '타격의 대가',
-  '질량 증가', '기습의 대가', '결투의 대가', '바리케이드', '슈퍼 차지', '속전속결',
-  '안정된 상태', '정기 흡수', '각성', '전문의', '중갑 착용', '급소 타격', '마나의 흐름',
-  '최대 마나 증가', '위기 모면', '구슬동자', '에테르 포식자',
-];
-
-const ACCESSORY_PARTS = [
-  { name: '장신구 전체', code: 200000 },
-  { name: '목걸이', code: 200010 },
-  { name: '귀걸이', code: 200020 },
-  { name: '반지', code: 200030 },
-];
-
-const STONE_CATEGORY_FALLBACKS = [
-  { name: '자동/전체 검색', code: 0 },
-  { name: '어빌리티 스톤', code: 300000 },
-];
-
-const GRADES = ['고대', '유물', '전설'];
-const PRICE_MODES = [
-  { value: 'min_buy_price', label: '최저 즉시구매가' },
-  { value: 'avg_top_n', label: '상위 N개 평균가' },
-];
-
-const ACCESSORY_EFFECT_FALLBACKS = [
-  '선택 안 함',
-  '깨달음',
-  '추가 피해',
-  '공격력',
-  '무기 공격력',
-  '치명타 적중률',
-  '치명타 피해',
-  '적에게 주는 피해',
-  '낙인력',
-  '아군 강화',
-];
-
-function formatGold(value) {
-  return `${Math.round(value).toLocaleString('ko-KR')} G`;
-}
-
-function formatKrw(value) {
-  return `${Math.round(value).toLocaleString('ko-KR')} 원`;
-}
-
-function prettyJson(value) {
-  return JSON.stringify(value, null, 2);
-}
-
-function toOptionsFromNames(names) {
-  return names.map((name) => ({ name, code: name }));
-}
-
-function uniqueByName(items) {
-  const seen = new Set();
-  const result = [];
-  for (const item of items || []) {
-    if (!item?.name) continue;
-    const key = `${item.name}:${item.code ?? ''}:${item.group_code ?? ''}:${item.group_name ?? ''}`;
-    if (seen.has(key)) continue;
-    result.push(item);
-    seen.add(key);
-  }
-  return result;
-}
-
-function mergeOptions(primary, fallbackNames) {
-  const fallback = toOptionsFromNames(fallbackNames);
-  return uniqueByName([...(primary || []), ...fallback]);
-}
-
-function findOptionByName(options, name) {
-  if (!name || name === '선택 안 함') return null;
-  const normalized = String(name).trim();
-  return (options || []).find((opt) => String(opt.name).trim() === normalized)
-    || (options || []).find((opt) => String(opt.name).includes(normalized));
-}
-
-function normalizeCategories(parsedCategories, fallback) {
-  const rows = [];
-  for (const cat of parsedCategories || []) {
-    rows.push({ name: cat.name, code: cat.code });
-    for (const child of cat.children || []) {
-      rows.push({ name: `${cat.name} > ${child.name}`, code: child.code });
-    }
-  }
-  return uniqueByName([...rows, ...fallback]);
-}
-
-function flattenEtcOptions(parsed) {
-  const result = [];
-  for (const group of parsed?.etc_options || []) {
-    const groupName = String(group.name || '');
-    const groupCode = group.code;
-    for (const child of group.children || []) {
-      result.push({
-        group_code: groupCode,
-        group_name: groupName,
-        code: child.code,
-        name: child.name,
-        label: `${groupName} / ${child.name}`,
-      });
-    }
-  }
-  return uniqueByName(result);
-}
-
-function accessoryEffectOptions(parsed) {
-  const all = flattenEtcOptions(parsed);
-  const filtered = all.filter((item) => {
-    const text = `${item.group_name || ''} ${item.name || ''}`;
-    if (text.includes('각인')) return false;
-    if (['치명', '특화', '신속', '제압', '인내', '숙련'].includes(item.name)) return false;
-    return (
-      text.includes('연마') ||
-      text.includes('장신구') ||
-      text.includes('깨달음') ||
-      text.includes('아크') ||
-      text.includes('공격') ||
-      text.includes('피해') ||
-      text.includes('낙인') ||
-      text.includes('치명타') ||
-      text.includes('아군')
-    );
-  });
-  return mergeOptions(filtered, ACCESSORY_EFFECT_FALLBACKS);
-}
-
-function makeEtcOptionFromList(options, optionName, minValue = 1, maxValue = 999999) {
-  const found = findOptionByName(options, optionName);
-  if (!found || found.group_code == null || found.code == null) return null;
-  return {
-    FirstOption: Number(found.group_code),
-    SecondOption: Number(found.code),
-    MinValue: Number(minValue),
-    MaxValue: Number(maxValue),
-  };
-}
-
-function makeStoneEngravingOption(parsed, optionName) {
-  return makeEtcOptionFromList(parsed?.engraving_options || [], optionName, 1, 999999);
-}
-
-function makeAccessoryEffectOption(parsed, optionName, minValue) {
-  return makeEtcOptionFromList(accessoryEffectOptions(parsed), optionName, minValue, 999999);
-}
-
-function StatCard({ title, value, sub }) {
-  return (
-    <div className="stat-card">
-      <p className="stat-title">{title}</p>
-      <h3>{value}</h3>
-      {sub ? <p className="stat-sub">{sub}</p> : null}
-    </div>
-  );
-}
-
-function SelectField({ label, value, onChange, children, disabled = false }) {
-  return (
-    <label>
-      {label}
-      <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
-        {children}
-      </select>
-    </label>
-  );
-}
-
-function NumberField({ label, value, onChange, min, max, step = 1, placeholder }) {
-  return (
-    <label>
-      {label}
-      <input
-        type="number"
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
-  );
-}
-
-function AuctionSearchPanel({ onSaved }) {
-  const [mode, setMode] = useState('accessory');
-  const [parsedOptions, setParsedOptions] = useState(null);
-  const [rawPath, setRawPath] = useState('');
-  const [auctionResult, setAuctionResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const [form, setForm] = useState({
-    key: 'accessory_base',
-    name: '장신구 세팅비',
-    price_mode: 'min_buy_price',
-    save_as_latest: true,
-    top_n: 10,
-    item_tier: 4,
-    item_grade: '고대',
-    class_name: '소서리스',
-    class_engraving: '점화',
-    preset_role: '딜러',
-    accessory_part_code: 200000,
-    stone_category_code: 0,
-    quality_min: 80,
-    polish_stage: 3,
-    enlightenment_min: 0,
-    accessory_effect1: '선택 안 함',
-    accessory_effect1_min: 0,
-    accessory_effect2: '선택 안 함',
-    accessory_effect2_min: 0,
-    stone_engraving1: '원한',
-    stone_engraving2: '예리한 둔기',
-    item_name: '',
-    page_no: 1,
-  });
-
-  const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
-
-  const classOptions = useMemo(() => mergeOptions(parsedOptions?.classes, LOSTARK_CLASSES), [parsedOptions]);
-
-  const classEngravings = useMemo(() => {
-    return mergeOptions([], CLASS_ENGRAVINGS[form.class_name] || []);
-  }, [form.class_name]);
-
-  const stoneEngravingOptions = useMemo(() => {
-    return mergeOptions(parsedOptions?.engraving_options, COMMON_STONE_ENGRAVINGS);
-  }, [parsedOptions]);
-
-  const gradeOptions = useMemo(() => mergeOptions(parsedOptions?.grades, GRADES), [parsedOptions]);
-
-  const accessoryCategories = useMemo(() => {
-    return normalizeCategories(parsedOptions?.categories, ACCESSORY_PARTS);
-  }, [parsedOptions]);
-
-  const stoneCategories = useMemo(() => {
-    const fromApi = (parsedOptions?.categories || []).filter((x) => String(x.name || '').includes('스톤'));
-    return normalizeCategories(fromApi, STONE_CATEGORY_FALLBACKS);
-  }, [parsedOptions]);
-
-  const accessoryOptions = useMemo(() => accessoryEffectOptions(parsedOptions), [parsedOptions]);
-
-  const switchMode = (nextMode) => {
-    setMode(nextMode);
-    if (nextMode === 'accessory') {
-      setForm((prev) => ({ ...prev, key: 'accessory_base', name: `${prev.class_name} ${prev.class_engraving} 장신구 세팅비`, item_name: '' }));
-    } else {
-      setForm((prev) => ({ ...prev, key: 'ability_stone', name: '어빌리티 스톤 가격', item_name: '어빌리티 스톤' }));
-    }
-  };
-
-  const applyPreset = () => {
-    const role = SUPPORT_CLASSES.has(form.class_name) ? '서포터' : '딜러';
-    setForm((prev) => ({
-      ...prev,
-      preset_role: role,
-      name: `${prev.class_name} ${prev.class_engraving} 장신구 세팅비`,
-      key: 'accessory_base',
-      item_tier: 4,
-      item_grade: '고대',
-      quality_min: role === '서포터' ? 80 : 85,
-      polish_stage: 3,
-      accessory_effect1: '선택 안 함',
-      accessory_effect1_min: 0,
-      accessory_effect2: '선택 안 함',
-      accessory_effect2_min: 0,
-    }));
-  };
-
-  const loadOptions = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await axios.get(`${API_BASE}/api/options/auctions/parsed`);
-      setParsedOptions(res.data.parsed);
-      setRawPath(res.data.raw_path);
-    } catch (e) {
-      setError(e?.response?.data?.detail || e.message || '경매장 옵션 조회 실패');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const payload = useMemo(() => {
-    const etcOptions = [];
-    const missing = [];
-
-    const addAccessoryOption = (name, min) => {
-      if (!name || name === '선택 안 함') return;
-      const option = makeAccessoryEffectOption(parsedOptions, name, min);
-      if (option) etcOptions.push(option);
-      else if (parsedOptions) missing.push(name);
-    };
-
-    const addStoneEngraving = (name) => {
-      if (!name || name === '선택 안 함') return;
-      const option = makeStoneEngravingOption(parsedOptions, name);
-      if (option) etcOptions.push(option);
-      else if (parsedOptions) missing.push(name);
-    };
-
-    if (mode === 'accessory') {
-      addAccessoryOption(form.accessory_effect1, form.accessory_effect1_min);
-      addAccessoryOption(form.accessory_effect2, form.accessory_effect2_min);
-      if (Number(form.enlightenment_min) > 0) {
-        addAccessoryOption('깨달음', form.enlightenment_min);
-      }
-    } else {
-      addStoneEngraving(form.stone_engraving1);
-      addStoneEngraving(form.stone_engraving2);
-    }
-
-    const built = {
-      CategoryCode: Number(mode === 'accessory' ? form.accessory_part_code : form.stone_category_code),
-      ItemTier: Number(form.item_tier),
-      ItemGrade: form.item_grade || undefined,
-      ItemGradeQuality: mode === 'accessory' ? Number(form.quality_min) : undefined,
-      PageNo: Number(form.page_no),
-      Sort: 'BUY_PRICE',
-      SortCondition: 'ASC',
-      ItemName: mode === 'stone' ? (form.item_name || '어빌리티 스톤') : form.item_name,
-      SkillOptions: [],
-      EtcOptions: etcOptions,
-    };
-
-    Object.keys(built).forEach((key) => {
-      if (built[key] === undefined || built[key] === '') delete built[key];
-    });
-    return { built, missing };
-  }, [form, mode, parsedOptions]);
-
-  const searchAuction = async () => {
-    setLoading(true);
-    setError('');
-    setAuctionResult(null);
-    try {
-      const res = await axios.post(`${API_BASE}/api/auctions/search`, {
-        key: form.key,
-        name: form.name,
-        payload: payload.built,
-        price_mode: form.price_mode,
-        save_as_latest: form.save_as_latest,
-        top_n: Number(form.top_n),
-      });
-      setAuctionResult(res.data);
-      if (res.data.saved_to && onSaved) onSaved();
-    } catch (e) {
-      const detail = e?.response?.data?.detail;
-      const hint = e?.response?.data?.hint;
-      setError(`${detail || e.message || '경매장 검색 실패'}${hint ? `\n${hint}` : ''}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <section className="panel">
-      <div className="section-title-row">
-        <div>
-          <h2>장신구/스톤 경매장 검색</h2>
-          <p className="muted">
-            현재 장신구 기준에 맞춰 악세 검색에서 특성과 유효각인을 제거했습니다. 직업과 직업각인은 검색 조건이 아니라
-            프리셋 추천과 결과 이름에만 사용합니다. 실제 검색 조건은 부위, 등급, 품질, 연마/깨달음 옵션 중심입니다.
-          </p>
-        </div>
-        <button className="secondary" onClick={loadOptions} disabled={loading}>
-          {parsedOptions ? '옵션 다시 조회' : '경매장 옵션 조회'}
-        </button>
-      </div>
-
-      <div className="mode-tabs">
-        <button className={mode === 'accessory' ? 'tab active' : 'tab'} onClick={() => switchMode('accessory')}>장신구</button>
-        <button className={mode === 'stone' ? 'tab active' : 'tab'} onClick={() => switchMode('stone')}>어빌리티 스톤</button>
-      </div>
-
-      {!parsedOptions ? (
-        <div className="warning-box">
-          먼저 <strong>경매장 옵션 조회</strong>를 눌러주세요. 조회 후 장신구 연마/깨달음 옵션과 스톤 각인 코드가 자동으로 매칭됩니다.
-          API 키가 없으면 기본 드롭다운은 보이지만 세부 옵션 코드는 payload에 들어가지 않을 수 있습니다.
-        </div>
-      ) : rawPath ? <p className="source-note">옵션 원본 저장: {rawPath}</p> : null}
-
-      <div className="form-grid auction-grid compact-grid">
-        <SelectField label="검색 유형" value={mode} onChange={switchMode}>
-          <option value="accessory">장신구</option>
-          <option value="stone">어빌리티 스톤</option>
-        </SelectField>
-        <label>
-          저장 키
-          <input value={form.key} onChange={(e) => update('key', e.target.value)} />
-        </label>
-        <label>
-          표시 이름
-          <input value={form.name} onChange={(e) => update('name', e.target.value)} />
-        </label>
-        <SelectField label="가격 계산 방식" value={form.price_mode} onChange={(v) => update('price_mode', v)}>
-          {PRICE_MODES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-        </SelectField>
-      </div>
-
-      <div className="builder-card">
-        <h3>1. 직업/직각 프리셋</h3>
-        <p className="muted small-muted">
-          이 값은 장신구 경매장 payload에 직접 들어가지 않습니다. 현재 장신구에는 특성/유효각인 검색을 쓰지 않고,
-          직업별 기본 품질·역할 프리셋과 결과 이름을 정하는 데만 사용합니다.
-        </p>
-        <div className="form-grid auction-grid compact-grid">
-          <SelectField label="직업" value={form.class_name} onChange={(v) => {
-            const next = CLASS_ENGRAVINGS[v]?.[0] || '선택 안 함';
-            setForm((prev) => ({
-              ...prev,
-              class_name: v,
-              class_engraving: next,
-              preset_role: SUPPORT_CLASSES.has(v) ? '서포터' : '딜러',
-            }));
-          }}>
-            {classOptions.map((item) => <option key={`${item.name}-${item.code}`} value={item.name}>{item.name}</option>)}
-          </SelectField>
-          <SelectField label="직업 각인" value={form.class_engraving} onChange={(v) => update('class_engraving', v)}>
-            <option value="선택 안 함">선택 안 함</option>
-            {classEngravings.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
-          </SelectField>
-          <SelectField label="세팅 역할" value={form.preset_role} onChange={(v) => update('preset_role', v)}>
-            <option value="딜러">딜러</option>
-            <option value="서포터">서포터</option>
-            <option value="커스텀">커스텀</option>
-          </SelectField>
-          <label className="button-label">
-            프리셋 적용
-            <button type="button" className="ghost full-button" onClick={applyPreset}>직업 기준 자동 설정</button>
-          </label>
-        </div>
-      </div>
-
-      <div className="builder-card">
-        <h3>2. {mode === 'accessory' ? '장신구 검색 조건' : '어빌리티 스톤 검색 조건'}</h3>
-        <div className="form-grid auction-grid compact-grid">
-          {mode === 'accessory' ? (
-            <>
-              <SelectField label="장신구 부위" value={form.accessory_part_code} onChange={(v) => update('accessory_part_code', v)}>
-                {accessoryCategories.map((item) => <option key={`${item.name}-${item.code}`} value={item.code}>{item.name} ({item.code})</option>)}
-              </SelectField>
-              <SelectField label="등급" value={form.item_grade} onChange={(v) => update('item_grade', v)}>
-                {gradeOptions.map((item) => <option key={`${item.name}-${item.code}`} value={item.name}>{item.name}</option>)}
-              </SelectField>
-              <NumberField label="티어" value={form.item_tier} onChange={(v) => update('item_tier', v)} min="1" max="4" />
-              <NumberField label="최소 품질" value={form.quality_min} onChange={(v) => update('quality_min', v)} min="0" max="100" />
-              <NumberField label="연마 단계" value={form.polish_stage} onChange={(v) => update('polish_stage', v)} min="0" max="3" />
-              <NumberField label="깨달음 최소값" value={form.enlightenment_min} onChange={(v) => update('enlightenment_min', v)} min="0" placeholder="선택 입력" />
-              <SelectField label="연마/아크 옵션 1" value={form.accessory_effect1} onChange={(v) => update('accessory_effect1', v)}>
-                {accessoryOptions.map((item) => <option key={`${item.name}-${item.code}-${item.group_code}-a1`} value={item.name}>{item.label || item.name}</option>)}
-              </SelectField>
-              <NumberField label="옵션 1 최소값" value={form.accessory_effect1_min} onChange={(v) => update('accessory_effect1_min', v)} min="0" />
-              <SelectField label="연마/아크 옵션 2" value={form.accessory_effect2} onChange={(v) => update('accessory_effect2', v)}>
-                {accessoryOptions.map((item) => <option key={`${item.name}-${item.code}-${item.group_code}-a2`} value={item.name}>{item.label || item.name}</option>)}
-              </SelectField>
-              <NumberField label="옵션 2 최소값" value={form.accessory_effect2_min} onChange={(v) => update('accessory_effect2_min', v)} min="0" />
-            </>
-          ) : (
-            <>
-              <SelectField label="스톤 카테고리" value={form.stone_category_code} onChange={(v) => update('stone_category_code', v)}>
-                {stoneCategories.map((item) => <option key={`${item.name}-${item.code}`} value={item.code}>{item.name} ({item.code})</option>)}
-              </SelectField>
-              <label>
-                아이템명
-                <input value={form.item_name} onChange={(e) => update('item_name', e.target.value)} placeholder="예: 어빌리티 스톤" />
-              </label>
-              <SelectField label="등급" value={form.item_grade} onChange={(v) => update('item_grade', v)}>
-                {gradeOptions.map((item) => <option key={`${item.name}-${item.code}`} value={item.name}>{item.name}</option>)}
-              </SelectField>
-              <NumberField label="티어" value={form.item_tier} onChange={(v) => update('item_tier', v)} min="1" max="4" />
-              <SelectField label="스톤 각인 1" value={form.stone_engraving1} onChange={(v) => update('stone_engraving1', v)}>
-                <option value="선택 안 함">선택 안 함</option>
-                {stoneEngravingOptions.map((item) => <option key={`${item.name}-${item.code}-se1`} value={item.name}>{item.name}</option>)}
-              </SelectField>
-              <SelectField label="스톤 각인 2" value={form.stone_engraving2} onChange={(v) => update('stone_engraving2', v)}>
-                <option value="선택 안 함">선택 안 함</option>
-                {stoneEngravingOptions.map((item) => <option key={`${item.name}-${item.code}-se2`} value={item.name}>{item.name}</option>)}
-              </SelectField>
-            </>
-          )}
-          <NumberField label="표시 매물 수" value={form.top_n} onChange={(v) => update('top_n', v)} min="1" max="50" />
-        </div>
-      </div>
-
-      {payload.missing.length ? (
-        <div className="warning-box danger">
-          옵션 코드 자동 매칭 실패: {payload.missing.join(', ')}. 경매장 옵션 조회 결과에 해당 이름이 있는지 확인하거나 조건을 줄여서 검색하세요.
-        </div>
-      ) : null}
-
-      <div className="checks">
-        <label>
-          <input type="checkbox" checked={form.save_as_latest} onChange={(e) => update('save_as_latest', e.target.checked)} />
-          검색 가격을 latest_prices.json에 저장
-        </label>
-      </div>
-
-      <details className="json-box payload-preview">
-        <summary>자동 생성된 API payload 보기</summary>
-        <pre>{prettyJson(payload.built)}</pre>
-      </details>
-
-      <button className="primary" onClick={searchAuction} disabled={loading}>
-        {loading ? '조회 중...' : '경매장 검색/가격 저장'}
-      </button>
-      {error ? <p className="error whitespace">{error}</p> : null}
-
-      {auctionResult ? (
-        <div className="auction-result">
-          <h3>검색 결과</h3>
-          <p className="source-note">
-            추정 가격: {auctionResult.price_gold ? formatGold(auctionResult.price_gold) : '가격 없음'} · 총 검색 수: {auctionResult.total_count ?? '알 수 없음'} · 원본: {auctionResult.raw_path}
-          </p>
-          {auctionResult.saved_to ? <p className="saved-note">latest_prices.json에 저장됨: {auctionResult.saved_to}</p> : null}
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>이름</th>
-                  <th>등급</th>
-                  <th>품질</th>
-                  <th>즉구가</th>
-                  <th>입찰가</th>
-                  <th>옵션 요약</th>
-                </tr>
-              </thead>
-              <tbody>
-                {auctionResult.items.map((item, idx) => (
-                  <tr key={idx}>
-                    <td>{item.item_name || '-'}</td>
-                    <td>{item.grade || '-'}</td>
-                    <td>{item.quality ?? '-'}</td>
-                    <td>{item.buy_price ? formatGold(item.buy_price) : '-'}</td>
-                    <td>{item.bid_price ? formatGold(item.bid_price) : '-'}</td>
-                    <td>{item.options?.join(', ') || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function LatestPricesPanel({ refreshKey }) {
-  const [prices, setPrices] = useState(null);
-  const [error, setError] = useState('');
-
-  React.useEffect(() => {
-    let ignore = false;
-    axios.get(`${API_BASE}/api/prices/latest`)
-      .then((res) => { if (!ignore) setPrices(res.data); })
-      .catch((e) => { if (!ignore) setError(e.message); });
-    return () => { ignore = true; };
-  }, [refreshKey]);
-
-  const rows = useMemo(() => Object.values(prices?.prices || {}), [prices]);
-  if (error) return <p className="error">가격 조회 실패: {error}</p>;
-  return (
-    <section className="panel compact-panel">
-      <h2>현재 저장된 가격</h2>
-      <p className="source-note">updated_at: {prices?.updated_at || '없음'}</p>
-      {rows.length === 0 ? <p className="muted">아직 저장된 가격이 없습니다.</p> : (
-        <div className="price-list">
-          {rows.map((row) => (
-            <div className="price-chip" key={row.key}>
-              <span>{row.name || row.key}</span>
-              <strong>{row.price_gold ? formatGold(row.price_gold) : '가격 없음'}</strong>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
+import { collectMaterialPrices, compareCharacter, getCharacterSummary, ensureMaterialPrices, getHoningTable, getMaterialPriceAutoStatus } from './api/client.js';
+import CharacterPanel from './components/CharacterPanel.jsx';
+import ResultPanel from './components/ResultPanel.jsx';
+import HoningTablePanel from './components/HoningTablePanel.jsx';
+import './styles/app.css';
 
 function App() {
-  const [form, setForm] = useState({
-    users: 1000,
-    seed: 42,
-    krw_per_gold: 0.4,
-    include_stone: true,
-    include_accessory: true,
-    stone_target_a: 7,
-    stone_target_b: 7,
-    stone_max_negative: 4,
-    stone_price_gold: '',
-    accessory_base_gold: '',
-    use_latest_api_prices: true,
-    actual_user_gold: '',
-    save_parquet: false,
-  });
+  const [characterName, setCharacterName] = useState('');
+  const [character, setCharacter] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [modules, setModules] = useState({ equipment: true, abilityStone: true, accessory: true });
+  const [simulationCount, setSimulationCount] = useState(100000);
+  const [krwPer100Gold, setKrwPer100Gold] = useState(12);
+  const [materialPrices, setMaterialPrices] = useState(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [honingTable, setHoningTable] = useState(null);
+  const [honingTableLoading, setHoningTableLoading] = useState(false);
+  const [autoPriceStatus, setAutoPriceStatus] = useState(null);
+  const [priceAutoLoaded, setPriceAutoLoaded] = useState(false);
+  const [memoryHints, setMemoryHints] = useState({
+    pityRecords: [{ part: 'unknown', target: 'unknown' }],
+    stoneAttempts: ''
+  });
 
-  const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+  useEffect(() => {
+    loadMaterialPrices();
+    getMaterialPriceAutoStatus().then(setAutoPriceStatus).catch(() => null);
+  }, []);
 
-  const runSimulation = async () => {
+  useEffect(() => {
+    if (!character) return;
+    setMemoryHints((prev) => {
+      const current = Array.isArray(prev.pityRecords) ? prev.pityRecords : [];
+      let changed = false;
+      const next = current.map((record) => {
+        const allowedTargets = targetOptionsForPart(record.part || 'unknown');
+        if (record.target && record.target !== 'unknown' && !allowedTargets.includes(record.target)) {
+          changed = true;
+          return { ...record, target: 'unknown' };
+        }
+        return record;
+      });
+      return changed ? { ...prev, pityRecords: next } : prev;
+    });
+  }, [character]);
+
+  async function loadHoningTable() {
+    setHoningTableLoading(true);
+    setError('');
+    try {
+      const data = await getHoningTable();
+      setHoningTable(data);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setHoningTableLoading(false);
+    }
+  }
+
+  async function loadMaterialPrices() {
+    setPriceLoading(true);
+    setError('');
+    try {
+      // v35: 첫 접속 시 DB 확인 버튼을 누르지 않아도 서버가 최신/저장 시세를 보장합니다.
+      // DB가 비어 있거나 TTL이 지난 경우에만 백엔드에서 수집하고, 유효한 DB가 있으면 API를 다시 호출하지 않습니다.
+      const data = await ensureMaterialPrices();
+      setMaterialPrices(data);
+      setPriceAutoLoaded(true);
+      getMaterialPriceAutoStatus().then(setAutoPriceStatus).catch(() => null);
+    } catch (e) {
+      setError(e.message);
+      setPriceAutoLoaded(false);
+    } finally {
+      setPriceLoading(false);
+      loadHoningTable();
+    }
+  }
+
+  async function refreshMaterialPrices() {
+    setPriceLoading(true);
+    setError('');
+    try {
+      const data = await collectMaterialPrices();
+      setMaterialPrices(data);
+      getMaterialPriceAutoStatus().then(setAutoPriceStatus).catch(() => null);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setPriceLoading(false);
+      loadHoningTable();
+    }
+  }
+
+  function materialPriceSummary() {
+    const items = materialPrices?.items || [];
+    const valid = items.filter((x) => x.unitPriceGold !== null && x.unitPriceGold !== undefined);
+    if (priceLoading && !items.length) return '재련 재료 시세를 자동으로 불러오는 중입니다.';
+    if (!items.length) {
+      if (autoPriceStatus?.ok === false) return `시세 자동 수집 실패 · 기본값으로 계산 중 (${autoPriceStatus.error || '원인 미상'})`;
+      return '저장된 시세가 아직 없습니다. 기본값으로 먼저 계산하고, 서버가 자동 수집을 시도합니다.';
+    }
+    if (materialPrices?.cacheUsed) return materialPrices.message || '저장된 DB 시세를 재사용했습니다.';
+    if (materialPrices?.message) return materialPrices.message;
+    const last = items.map((x) => x.collectedAt).filter(Boolean).sort().at(-1);
+    return `${valid.length}/${items.length}개 재료 가격 적용${last ? ` · 기준 ${last}` : ''}`;
+  }
+
+  function priceBadgeText() {
+    const items = materialPrices?.items || [];
+    if (priceLoading && !items.length) return '자동 로드 중';
+    if (items.length) return materialPrices?.cacheUsed ? 'DB 시세 적용' : '시세 적용됨';
+    if (autoPriceStatus?.ok === false || priceAutoLoaded === false) return '기본값 계산 중';
+    return '자동 로드 대기';
+  }
+
+  function materialPriceChipText(item) {
+    if (!item.unitPriceGold) return `${item.materialName}: 실패`;
+    const unit = `${Number(item.unitPriceGold).toFixed(2)}G/개`;
+    const bundle = Number(item.bundleCount || 1);
+    const raw = item.rawPriceGold ? `${Number(item.rawPriceGold).toLocaleString('ko-KR')}G` : null;
+    if (bundle > 1 && raw) return `${item.materialName}: ${unit} · ${bundle.toLocaleString('ko-KR')}개 묶음 ${raw}`;
+    return `${item.materialName}: ${unit}`;
+  }
+
+  async function loadCharacter(force = false) {
+    if (!characterName.trim()) {
+      setError('캐릭터명을 입력하세요.');
+      return;
+    }
     setLoading(true);
     setError('');
     setResult(null);
     try {
-      const requestPayload = {
-        ...form,
-        users: Number(form.users),
-        seed: Number(form.seed),
-        krw_per_gold: Number(form.krw_per_gold),
-        stone_target_a: Number(form.stone_target_a),
-        stone_target_b: Number(form.stone_target_b),
-        stone_max_negative: Number(form.stone_max_negative),
-        stone_price_gold: form.stone_price_gold === '' ? null : Number(form.stone_price_gold),
-        accessory_base_gold: form.accessory_base_gold === '' ? null : Number(form.accessory_base_gold),
-        actual_user_gold: form.actual_user_gold === '' ? null : Number(form.actual_user_gold),
-      };
-      const res = await axios.post(`${API_BASE}/api/simulations/run`, requestPayload);
-      setResult(res.data);
+      const data = await getCharacterSummary(characterName.trim(), !force);
+      setCharacter(data);
     } catch (e) {
-      setError(e?.response?.data?.detail || e.message || '시뮬레이션 실패');
+      setError(e.message);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function runReport() {
+    if (!characterName.trim()) {
+      setError('먼저 캐릭터명을 입력하세요.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const selected = Object.entries(modules).filter(([, v]) => v).map(([k]) => k);
+      const data = await compareCharacter({
+        characterName: characterName.trim(),
+        compareModules: selected,
+        // v29: 기본 모드는 실제 사용 골드를 요구하지 않습니다.
+        // 캐릭터 현재 결과물의 재현 비용/희귀도/증언 기반 보조 판정으로 억까 가능성을 계산합니다.
+        actualCostGold: {
+          equipment: 0,
+          abilityStone: 0,
+          accessory: 0
+        },
+        simulationCount: Number(simulationCount),
+        krwPer100Gold: Number(krwPer100Gold),
+        seed: 42,
+        useCachedCharacter: true
+      });
+      setCharacter(data.character);
+      setResult(data);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggleModule(name) {
+    setModules((prev) => ({ ...prev, [name]: !prev[name] }));
+  }
+
+  function setMemory(name, value) {
+    setMemoryHints((prev) => ({ ...prev, [name]: value }));
+  }
+
+  const allHoningTargetOptions = Array.from({ length: 14 }, (_, idx) => {
+    const from = 11 + idx;
+    return `+${from} → +${from + 1}`;
+  });
+
+  const partSlotMap = {
+    weapon: '무기',
+    helmet: '투구',
+    chest: '상의',
+    pants: '하의',
+    gloves: '장갑',
+    shoulder: '어깨'
   };
 
+  function targetToLevel(value) {
+    const match = String(value || '').match(/→\s*\+(\d+)/);
+    return match ? Number(match[1]) : null;
+  }
+
+  function currentMaxHoningByPart(part) {
+    const equipment = character?.equipment || [];
+    const isWeapon = (item) => String(item.slot || '').includes('무기');
+    const rows = equipment.filter((item) => {
+      const slot = String(item.slot || '');
+      if (part === 'weapon') return isWeapon(item);
+      if (part === 'armor_unknown') return !isWeapon(item);
+      if (partSlotMap[part]) return slot.includes(partSlotMap[part]);
+      return true;
+    });
+    const levels = rows.map((item) => Number(item.honing_level || 0)).filter((n) => n > 0);
+    return levels.length ? Math.max(...levels) : null;
+  }
+
+  function targetOptionsForPart(part) {
+    const maxLevel = currentMaxHoningByPart(part);
+    if (!maxLevel) return allHoningTargetOptions;
+    return allHoningTargetOptions.filter((target) => {
+      const to = targetToLevel(target);
+      return to !== null && to <= maxLevel;
+    });
+  }
+
+  function updatePityRecord(index, field, value) {
+    setMemoryHints((prev) => {
+      const current = Array.isArray(prev.pityRecords) ? prev.pityRecords : [];
+      const next = current.map((record, i) => {
+        if (i !== index) return record;
+        if (field === 'part') {
+          const allowedTargets = targetOptionsForPart(value);
+          const nextTarget = allowedTargets.includes(record.target) ? record.target : 'unknown';
+          return { ...record, part: value, target: nextTarget };
+        }
+        return { ...record, [field]: value };
+      });
+      return { ...prev, pityRecords: next.length ? next : [{ part: 'unknown', target: 'unknown' }] };
+    });
+  }
+
+  function addPityRecord() {
+    setMemoryHints((prev) => ({
+      ...prev,
+      pityRecords: [...(Array.isArray(prev.pityRecords) ? prev.pityRecords : []), { part: 'unknown', target: 'unknown' }]
+    }));
+  }
+
+  function removePityRecord(index) {
+    setMemoryHints((prev) => {
+      const current = Array.isArray(prev.pityRecords) ? prev.pityRecords : [];
+      const next = current.filter((_, i) => i !== index);
+      return { ...prev, pityRecords: next.length ? next : [{ part: 'unknown', target: 'unknown' }] };
+    });
+  }
+
   return (
-    <main className="page">
-      <section className="hero">
+    <main className="container">
+      <header className="hero ekka-hero">
         <div>
-          <p className="eyebrow">LOA-HSI</p>
-          <h1>나는 정말 접을 만큼 운이 없었을까?</h1>
-          <p className="lead">
-            재련, 어빌리티 스톤, 장신구 세팅 비용을 Monte Carlo 방식으로 시뮬레이션하고
-            평균 비용이 아닌 P90/P99 체감 불운 비용을 계산합니다.
-          </p>
+          <p className="eyebrow">LOA-HSI v41</p>
+          <h1>내가 접을 만했나? 로스트아크 성장 억까 리포트</h1>
+          <p className="hero-copy">핵심 결론만 먼저 보여주고, 자세한 계산은 필요할 때 펼쳐보는 리포트입니다.</p>
+        </div>
+      </header>
+
+      <section className="card input-card">
+        <h2>1. 캐릭터 검색</h2>
+        <div className="row">
+          <input value={characterName} onChange={(e) => setCharacterName(e.target.value)} placeholder="캐릭터명 입력" />
+          <button onClick={() => loadCharacter(false)} disabled={loading}>검색</button>
+          <button className="ghost" onClick={() => loadCharacter(true)} disabled={loading}>새로고침</button>
         </div>
       </section>
 
-      <AuctionSearchPanel onSaved={() => setRefreshKey((x) => x + 1)} />
-      <LatestPricesPanel refreshKey={refreshKey} />
+      <CharacterPanel character={character} />
 
-      <section className="panel grid-two">
-        <div>
-          <h2>시뮬레이션 설정</h2>
-          <div className="form-grid">
-            <NumberField label="유저 수" value={form.users} onChange={(v) => update('users', v)} />
-            <NumberField label="랜덤 시드" value={form.seed} onChange={(v) => update('seed', v)} />
-            <NumberField label="1골드 원화 환산" value={form.krw_per_gold} onChange={(v) => update('krw_per_gold', v)} step="0.01" />
-            <NumberField label="내가 쓴 총 골드" value={form.actual_user_gold} onChange={(v) => update('actual_user_gold', v)} placeholder="선택 입력" />
-            <NumberField label="목표 스톤 A" value={form.stone_target_a} onChange={(v) => update('stone_target_a', v)} />
-            <NumberField label="목표 스톤 B" value={form.stone_target_b} onChange={(v) => update('stone_target_b', v)} />
-            <NumberField label="스톤 1개 가격" value={form.stone_price_gold} onChange={(v) => update('stone_price_gold', v)} placeholder="비우면 API latest: ability_stone" />
-            <NumberField label="장신구 기본 세팅비" value={form.accessory_base_gold} onChange={(v) => update('accessory_base_gold', v)} placeholder="비우면 API latest: accessory_base" />
+      <section className="card input-card">
+        <h2>2. 억까 판정 설정</h2>
+        <div className="price-panel">
+          <div>
+            <strong>재련 재료 시세</strong>
+            <p className="hint">{materialPriceSummary()}</p>
           </div>
-
-          <div className="checks">
-            <label>
-              <input type="checkbox" checked={form.include_stone} onChange={(e) => update('include_stone', e.target.checked)} />
-              어빌리티 스톤 포함
-            </label>
-            <label>
-              <input type="checkbox" checked={form.include_accessory} onChange={(e) => update('include_accessory', e.target.checked)} />
-              장신구 포함
-            </label>
-            <label>
-              <input type="checkbox" checked={form.use_latest_api_prices} onChange={(e) => update('use_latest_api_prices', e.target.checked)} />
-              API 최신 수집 가격 사용
-            </label>
-            <label>
-              <input type="checkbox" checked={form.save_parquet} onChange={(e) => update('save_parquet', e.target.checked)} />
-              결과 Parquet 저장
-            </label>
+          <div className="price-actions">
+            <span className="auto-loaded-badge">{priceBadgeText()}</span>
+            <button className="ghost" onClick={refreshMaterialPrices} disabled={loading || priceLoading}>{priceLoading ? '갱신 중...' : '강제 새로고침'}</button>
           </div>
+        </div>
+        {autoPriceStatus && (
+          <p className="hint auto-price-status">자동 시세 수집: {autoPriceStatus.ok === false ? `실패 · ${autoPriceStatus.error || ''}` : `${autoPriceStatus.reason || 'startup'} · ${autoPriceStatus.message || '상태 확인됨'}`}</p>
+        )}
+        {materialPrices?.items?.length > 0 && (
+          <div className="material-chip-row">
+            {materialPrices.items.map((item) => (
+              <span className={item.unitPriceGold ? 'material-chip' : 'material-chip muted-chip'} key={item.materialKey} title={item.note || ''}>
+                {materialPriceChipText(item)}
+              </span>
+            ))}
+          </div>
+        )}
+        <HoningTablePanel data={honingTable} loading={honingTableLoading} onReload={loadHoningTable} character={character} />
 
-          <button className="primary" onClick={runSimulation} disabled={loading}>
-            {loading ? '계산 중...' : '시뮬레이션 실행'}
-          </button>
-          {error ? <p className="error">{error}</p> : null}
+        <div className="module-toggle-grid">
+          <label className={`module-toggle ${modules.equipment ? 'checked' : ''}`}>
+            <input type="checkbox" checked={modules.equipment} onChange={() => toggleModule('equipment')} />
+            <span className="module-toggle-icon">⚔</span>
+            <span><strong>장비 재련</strong><small>현재 장비 단계 재현 비용</small></span>
+          </label>
+          <label className={`module-toggle ${modules.abilityStone ? 'checked' : ''}`}>
+            <input type="checkbox" checked={modules.abilityStone} onChange={() => toggleModule('abilityStone')} />
+            <span className="module-toggle-icon">◆</span>
+            <span><strong>어빌리티 스톤</strong><small>활성 레벨 결과물 희귀도</small></span>
+          </label>
+          <label className={`module-toggle ${modules.accessory ? 'checked' : ''}`}>
+            <input type="checkbox" checked={modules.accessory} onChange={() => toggleModule('accessory')} />
+            <span className="module-toggle-icon">✦</span>
+            <span><strong>장신구 / 팔찌</strong><small>연마·유효옵션 희귀도</small></span>
+          </label>
         </div>
 
-        <div className="story-card">
-          <h2>발표 서사</h2>
-          <p>
-            게임을 하다가 캐릭터 성장 운이 너무 나빠서 남들보다 비용을 많이 썼고,
-            그 현타로 게임을 접었습니다. 이 프로젝트는 그 선택이 단순한 기분 탓이었는지,
-            아니면 실제로 확률적으로 불운한 구간이었는지 검증합니다.
-          </p>
+        <div className="memory-panel">
+          <div>
+            <h3>기억 기반 보조 판정</h3>
+            <p className="hint">실제 사용 골드는 묻지 않습니다. 현재 캐릭터의 장비 성장 중 기억나는 장기백 구간만 입력합니다. 구간이 애매하면 “모름”으로 두면 참고 단서로만 봅니다.</p>
+          </div>
+
+          <div className={`pity-record-panel ${modules.equipment ? '' : 'disabled-panel'}`}>
+            <div className="pity-record-header">
+              <strong>장기백 기록</strong>
+              <button type="button" className="ghost tiny-button" onClick={addPityRecord} disabled={!modules.equipment}>기록 추가</button>
+            </div>
+            <p className="hint">예: 무기 · +17 → +18. 같은 장기백을 여러 번 겪었다면 기록을 여러 줄 추가하세요. 현재 캐릭터가 도달한 강화 구간만 선택지에 표시합니다.</p>
+            <div className="pity-record-list">
+              {(memoryHints.pityRecords || []).map((record, index) => (
+                <div className="pity-record-row" key={index}>
+                  <select disabled={!modules.equipment} value={record.part || 'unknown'} onChange={(e) => updatePityRecord(index, 'part', e.target.value)}>
+                    <option value="unknown">부위 모름</option>
+                    <option value="weapon">무기</option>
+                    <option value="helmet">투구</option>
+                    <option value="chest">상의</option>
+                    <option value="pants">하의</option>
+                    <option value="gloves">장갑</option>
+                    <option value="shoulder">어깨</option>
+                    <option value="armor_unknown">방어구 중 하나</option>
+                  </select>
+                  <select disabled={!modules.equipment} value={targetOptionsForPart(record.part || 'unknown').includes(record.target) ? record.target : 'unknown'} onChange={(e) => updatePityRecord(index, 'target', e.target.value)}>
+                    <option value="unknown">강화 구간 모름</option>
+                    {targetOptionsForPart(record.part || 'unknown').map((target) => (
+                      <option value={target} key={target}>{target}</option>
+                    ))}
+                  </select>
+                  <button type="button" className="ghost tiny-button" onClick={() => removePityRecord(index)} disabled={!modules.equipment}>삭제</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-grid memory-grid numeric-memory-grid v36-memory-grid">
+            <label>스톤 시도 개수<span><input type="number" min="0" step="1" value={memoryHints.stoneAttempts} onChange={(e) => setMemory('stoneAttempts', e.target.value)} placeholder="예: 120" /> 개</span></label>
+            <label>시뮬레이션 수<span><select value={simulationCount} onChange={(e) => setSimulationCount(e.target.value)}><option value="10000">1만 명</option><option value="100000">10만 명</option><option value="300000">30만 명</option></select></span></label>
+            <label>100골드 원화 환산<span><input type="number" step="1" value={krwPer100Gold} onChange={(e) => setKrwPer100Gold(e.target.value)} /> 원</span></label>
+          </div>
         </div>
+
+        <button className="primary" onClick={runReport} disabled={loading}>{loading ? '분석 중...' : '억까 리포트 생성'}</button>
       </section>
 
-      {result ? (
-        <section className="panel">
-          <h2>결과 요약</h2>
-          <p className="source-note">가격 출처: {result.price_source === 'latest_api_prices' ? 'API 최신 수집 가격' : '샘플 가격'}</p>
-          <div className="stats">
-            <StatCard title="평균 비용" value={formatGold(result.avg_gold)} sub={formatKrw(result.avg_krw)} />
-            <StatCard title="P90 불운 비용" value={formatGold(result.p90_gold)} sub={formatKrw(result.p90_krw)} />
-            <StatCard title="P99 극단 불운 비용" value={formatGold(result.p99_gold)} sub={formatKrw(result.p99_krw)} />
-            <StatCard title="현금 불운세" value={formatGold(result.bad_luck_tax_gold)} sub={formatKrw(result.bad_luck_tax_krw)} />
+      {error && <div className="error-box">{error}</div>}
+      <ResultPanel result={result} memoryHints={memoryHints} />
+
+        <details className="notice-panel footer-notice-panel">
+          <summary>공지사항 / 업데이트 내역</summary>
+          <div className="notice-list version-history-list">
+            <p><strong>v41</strong> 장기백 입력에서 횟수와 시점 선택을 제거하고, 기록을 부위+강화구간 단위로 단순화했습니다. 강화 구간은 +11부터 현재 강화 단계까지 표시합니다.</p>
+            <p><strong>v40</strong> 에기르 장비와 운명의 전율 장비의 재련표 라벨을 분리하고, 캐릭터 장비 이름 기준으로 재련표 구간을 자동 선택하도록 수정했습니다. 백엔드 준비 전 API 502가 보이는 문제를 줄이기 위해 재시도와 헬스체크를 추가했습니다.</p>
+            <p><strong>v39</strong> 장기백 횟수 입력을 0~20회로 제한하고, 현재 캐릭터가 도달한 강화 구간만 선택지에 표시하도록 정리했습니다. 세부 분석은 결과 생성 시 기본 접힘 상태로 유지합니다.</p>
+            <p><strong>v38</strong> 결과 화면을 더 압축하고, 현재 캐릭터와 맞지 않는 장기백 기록은 강한 점수로 반영하지 않도록 보정했습니다. 공지사항을 하단으로 이동했습니다.</p>
+            <p><strong>v37</strong> 결과 화면을 간소화하고, 세부 계산은 접기 영역으로 이동했습니다. 체감 구간 선택을 제거하고, 선택하지 않은 분석 항목은 “분석 제외”로 표시합니다.</p>
+            <p><strong>v36</strong> 억까 단서와 재현 난이도를 분리하고, 장기백을 부위·강화 구간·시점 기반으로 입력하게 변경했습니다.</p>
+            <p><strong>v35</strong> 첫 접속 시 DB 시세를 자동 로드하고, 유효한 시세가 있으면 거래소 API를 다시 호출하지 않게 했습니다.</p>
+            <p><strong>v34</strong> 직업각인 프리셋을 캐릭터 조회 결과에 맞춰 자동 적용하고, 서버 시작 시 재련 재료 시세 자동 수집을 추가했습니다.</p>
+            <p><strong>v33</strong> 장신구 핵심 유효 종류/효과 수를 분리하고, 팔찌 옵션을 핵심·보조·조건부로 정리했습니다.</p>
+            <p><strong>v32</strong> 스톤 시도 수가 기대값보다 적으면 억까 점수를 주지 않고, 서포터 장신구/팔찌 판정을 강화했습니다.</p>
+            <p><strong>v31</strong> 억까 지수와 재현 난이도를 분리하고, 기억 입력이 없으면 판정 보류로 표시했습니다.</p>
+            <p><strong>v30</strong> 장기백 횟수와 스톤 시도 수를 직접 입력하게 하고, 여러 억까 구간 선택을 지원했습니다.</p>
+            <p><strong>v29</strong> 실제 사용 골드 입력 중심에서 캐릭터 결과물 기반 억까 리포트 구조로 전환했습니다.</p>
+            <p><strong>v28</strong> 어빌리티 스톤 3/1을 성공 횟수가 아니라 활성 레벨로 해석하도록 수정했습니다.</p>
+            <p><strong>v27</strong> 재련 재료비의 파편 단가 환산 오류를 수정하고 보조재료 최적화 기능을 제거했습니다.</p>
+            <p><strong>v26</strong> 묶음 단위 가격 환산과 재련비 최적화 계산을 시도했습니다.</p>
+            <p><strong>v25</strong> 보조재료 시세 수집과 접이식 제련 확률표를 추가했습니다.</p>
+            <p><strong>v24</strong> 제련 단계별 재료량과 성공 확률표를 추가했습니다.</p>
+            <p><strong>v23</strong> 기대값 프리셋과 장비·스톤·장신구 계산 기준을 정리했습니다.</p>
+            <p><strong>v22</strong> 비교 항목 체크박스와 장신구 연마 효과 표시를 개선했습니다.</p>
+            <p><strong>v21</strong> 기대값 계산 결과를 DB/캐시에 저장해 반복 계산 시간을 줄였습니다.</p>
+            <p><strong>v20</strong> 팔찌 효과 상세 파싱과 표시를 개선했습니다.</p>
+            <p><strong>v19</strong> 프론트엔드 API 프록시 경로 문제를 수정했습니다.</p>
+            <p><strong>v18</strong> Windows/Docker 환경의 nginx 실행 문제를 보완했습니다.</p>
+            <p><strong>v17</strong> 어빌리티 스톤 슬롯/표시 문제를 수정했습니다.</p>
+            <p><strong>v16</strong> 팔찌 특수효과 파싱을 개선했습니다.</p>
+            <p><strong>v15</strong> nginx 기본 페이지가 보이는 문제를 수정했습니다.</p>
+            <p><strong>v14</strong> 거래소 시세 수집 POST 요청 오류를 수정했습니다.</p>
+            <p><strong>v13</strong> 재료 시세 API 500 오류와 프론트 예외를 수정했습니다.</p>
+            <p><strong>v12</strong> Docker 빌드 중 npm install 문제를 보완했습니다.</p>
+            <p><strong>v11</strong> 재련 재료 시세 수집 기능을 추가했습니다.</p>
+            <p><strong>v10</strong> 팔찌와 스톤 표시를 함께 정리했습니다.</p>
+            <p><strong>v9</strong> 어빌리티 스톤 효과 표시 방식을 개선했습니다.</p>
+            <p><strong>v8</strong> 캐릭터 조회 실패 문제를 수정했습니다.</p>
+            <p><strong>v7</strong> pyLoa 구조를 참고해 캐릭터 조회 방식을 보완했습니다.</p>
+            <p><strong>v6</strong> 어빌리티 스톤을 한 개 기준으로 단순 표시하도록 변경했습니다.</p>
+            <p><strong>v5</strong> 어빌리티 스톤 파싱 오류를 수정했습니다.</p>
+            <p><strong>v4</strong> 사용자 친화적인 라벨과 표시 문구를 정리했습니다.</p>
+            <p><strong>v3</strong> DB 캐시 구조를 추가했습니다.</p>
+            <p><strong>v2</strong> 캐릭터 비교 화면의 기본 구조를 만들었습니다.</p>
+            <p><strong>v1</strong> 로스트아크 성장 억까 판정기 아이디어와 초기 스타터 구조를 잡았습니다.</p>
           </div>
-
-          {result.user_message ? <div className="verdict">{result.user_message}</div> : null}
-
-          <div className="chart-wrap">
-            <h3>총비용 분포</h3>
-            <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={result.histogram}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="label" angle={-20} textAnchor="end" height={80} />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="breakdown">
-            <h3>평균 비용 구성</h3>
-            <ul>
-              <li>재련 평균: {formatGold(result.honing_avg_gold)}</li>
-              <li>스톤 평균: {formatGold(result.stone_avg_gold)}</li>
-              <li>장신구 평균: {formatGold(result.accessory_avg_gold)}</li>
-              <li>평균 최장 연속 실패: {result.max_fail_streak_avg.toFixed(1)}회</li>
-              <li>평균 스톤 구매 횟수: {result.stone_attempts_avg.toFixed(1)}개</li>
-            </ul>
-            {result.parquet_path ? <p>저장 경로: {result.parquet_path}</p> : null}
-          </div>
-
-          <details className="assumptions">
-            <summary>현재 모델 가정 보기</summary>
-            <ul>
-              {result.assumptions.map((item) => <li key={item}>{item}</li>)}
-            </ul>
-          </details>
-        </section>
-      ) : null}
+        </details>
     </main>
   );
 }

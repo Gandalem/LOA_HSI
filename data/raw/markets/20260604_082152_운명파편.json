@@ -1,0 +1,40 @@
+{
+  "PageNo": 1,
+  "PageSize": 10,
+  "TotalCount": 3,
+  "Items": [
+    {
+      "CurrentMinPrice": 74,
+      "Id": 66130141,
+      "Name": "운명의 파편 주머니(소)",
+      "Grade": "고급",
+      "Icon": "https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_12_91.png",
+      "BundleCount": 1,
+      "TradeRemainCount": null,
+      "YDayAvgPrice": 78.6,
+      "RecentPrice": 77
+    },
+    {
+      "CurrentMinPrice": 144,
+      "Id": 66130142,
+      "Name": "운명의 파편 주머니(중)",
+      "Grade": "희귀",
+      "Icon": "https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_12_92.png",
+      "BundleCount": 1,
+      "TradeRemainCount": null,
+      "YDayAvgPrice": 162.4,
+      "RecentPrice": 156
+    },
+    {
+      "CurrentMinPrice": 189,
+      "Id": 66130143,
+      "Name": "운명의 파편 주머니(대)",
+      "Grade": "영웅",
+      "Icon": "https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_12_93.png",
+      "BundleCount": 1,
+      "TradeRemainCount": null,
+      "YDayAvgPrice": 206.9,
+      "RecentPrice": 190
+    }
+  ]
+}

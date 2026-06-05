@@ -1,0 +1,18 @@
+{
+  "PageNo": 1,
+  "PageSize": 10,
+  "TotalCount": 1,
+  "Items": [
+    {
+      "CurrentMinPrice": 17,
+      "Id": 66110226,
+      "Name": "위대한 운명의 돌파석",
+      "Grade": "희귀",
+      "Icon": "https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_13_251.png",
+      "BundleCount": 1,
+      "TradeRemainCount": null,
+      "YDayAvgPrice": 17.2,
+      "RecentPrice": 16
+    }
+  ]
+}

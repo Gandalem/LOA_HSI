@@ -1,0 +1,11 @@
+{
+  "profile": null,
+  "equipment": [],
+  "engravings": null,
+  "arkpassive": null,
+  "_source": "separate_endpoints",
+  "errors": {
+    "total_info_aux": "total-info 보조 조회는 실패하거나 빈 응답이어서 개별 endpoint 결과만 사용했습니다."
+  },
+  "fetchedAt": "2026-06-05T01:47:14+0000"
+}
