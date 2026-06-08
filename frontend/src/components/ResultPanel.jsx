@@ -325,6 +325,15 @@ function accessoryModeLabel(mode) {
   return map[mode] || '기억 안 남';
 }
 
+function braceletModeLabel(mode) {
+  const map = {
+    unknown: '기억 안 남',
+    base_purchased: '베이스 구매 후 직접 돌림',
+    self_obtained: '직접 획득 후 돌림'
+  };
+  return map[mode] || '기억 안 남';
+}
+
 function normalizeAccessorySlot(slot) {
   const s = String(slot || '');
   if (s.includes('목걸이')) return 'necklace';
@@ -493,13 +502,91 @@ function buildAccessoryMemoryAnalysis(result, memoryHints = {}, enabled = true) 
   return { score, offsetScore, label, detail, items, offsetItems, purchasedCount, unknownCount };
 }
 
+
+function braceletTargetForCurrent(bracelet = {}) {
+  const baseExpected = Number(bracelet.expectedAttemptsForValidSpecial || 0);
+  if (!baseExpected || baseExpected <= 0) {
+    return { expectedAttempts: null, label: '팔찌 기대값 없음', detail: '팔찌 공식 확률표 기반 기대값을 찾지 못했습니다.' };
+  }
+  const coreCount = Number((bracelet.currentValidEffects || []).length || 0);
+  const secondaryCount = Number((bracelet.currentSecondaryEffects || []).length || 0);
+  const conditionalCount = Number((bracelet.currentConditionalEffects || []).length || 0);
+  const likeCount = Number((bracelet.currentValidLikeEffects || []).length || 0);
+  let multiplier = 1;
+  if (coreCount >= 4) multiplier = 4.0;
+  else if (coreCount >= 3) multiplier = 3.0;
+  else if (coreCount >= 2) multiplier = 2.0;
+  else if (coreCount >= 1) multiplier = 1.0;
+  else multiplier = 0.7;
+  if (likeCount >= 5) multiplier *= 1.35;
+  else if (likeCount >= 4) multiplier *= 1.2;
+  else if (secondaryCount + conditionalCount >= 2) multiplier *= 1.1;
+  const expectedAttempts = baseExpected * multiplier;
+  const label = `핵심 유효 ${coreCount}개${likeCount ? ` / 유효 계열 ${likeCount}개` : ''}`;
+  return {
+    expectedAttempts,
+    label,
+    coreCount,
+    secondaryCount,
+    conditionalCount,
+    likeCount,
+    baseExpected,
+    detail: `공식 T4 팔찌 확률표의 유효 특수효과 기대값에 현재 팔찌의 핵심/보조/조건부 옵션 개수를 보정했습니다.`
+  };
+}
+
+function buildBraceletMemoryAnalysis(result, memoryHints = {}, enabled = true) {
+  if (!enabled) {
+    return { score: 0, offsetScore: 0, label: '분석 제외', detail: '장신구/팔찌 항목을 선택하지 않아 팔찌 시도 기록을 반영하지 않았습니다.', items: [], offsetItems: [] };
+  }
+  const input = memoryHints?.braceletAcquisition || { mode: 'unknown', attempts: '' };
+  const mode = input.mode || 'unknown';
+  if (!['base_purchased', 'self_obtained'].includes(mode)) {
+    return { score: 0, offsetScore: 0, label: '입력 없음', detail: '팔찌를 직접 돌린 시도 수가 없으면 억까 점수에는 넣지 않습니다.', items: [], offsetItems: [], mode };
+  }
+  const expected = result?.expectedValues?.braceletT4 || {};
+  const attempts = memoryNumber(input.attempts);
+  const target = braceletTargetForCurrent(expected);
+  const analysis = attemptComparisonAnalysis({ actualAttempts: attempts, expectedAttempts: target.expectedAttempts, itemName: '팔찌 랜덤 옵션 시도', unit: '개', enabled: true });
+  const row = {
+    key: 'braceletRandom',
+    name: '팔찌 랜덤 옵션',
+    score: Math.round(analysis.score),
+    offsetScore: Math.round(analysis.offsetScore),
+    kind: analysis.label,
+    detail: target.expectedAttempts
+      ? `${braceletModeLabel(mode)} · ${target.label} 목표 기준 기대 ${number(target.expectedAttempts)}개와 입력 ${attempts === null ? '미입력' : `${number(attempts, 0)}개`}를 비교했습니다. ${analysis.detail}`
+      : '현재 팔찌에서 공식 확률표와 비교할 목표를 계산하지 못했습니다.',
+    target,
+    attempts,
+    mode,
+    analysis
+  };
+  const items = row.score > 0 ? [row] : [];
+  const offsetItems = row.offsetScore > 0 ? [{ ...row, score: row.offsetScore }] : [];
+  const score = Math.round(clamp(row.score, 0, 35));
+  const offsetScore = Math.round(clamp(row.offsetScore, 0, 20));
+  let label = '입력 없음';
+  let detail = '팔찌를 직접 돌린 시도 수를 입력하면 공식 T4 팔찌 확률표 기준으로 비교합니다.';
+  if (items.length) {
+    label = score >= 30 ? '강한 팔찌 억까 단서' : score >= 15 ? '팔찌 억까 단서 있음' : '약한 팔찌 단서';
+    detail = '팔찌 랜덤 옵션 시도 수와 현재 팔찌 목표 기대값을 비교했습니다.';
+  } else if (offsetItems.length) {
+    label = '잘 나온 팔찌 기록 있음';
+    detail = '팔찌 랜덤 옵션이 기대보다 적은 시도에 끝난 기록입니다.';
+  }
+  return { score, offsetScore, label, detail, items, offsetItems, mode, attempts, target };
+}
+
 function hasMemoryEvidence(memoryHints, result) {
   const modules = result?.modules || {};
   const records = validPityRecords(memoryHints);
   const attempts = memoryNumber(memoryHints?.stoneAttempts);
   const accessoryInputs = Object.values(memoryHints?.accessoryAcquisitions || {});
   const hasAccessoryAttempt = Boolean(modules.accessory) && accessoryInputs.some((item) => item?.mode === 'polished' && memoryNumber(item?.attempts) !== null && memoryNumber(item?.attempts) > 0);
-  return (Boolean(modules.equipment) && records.length > 0) || (Boolean(modules.abilityStone) && attempts !== null && attempts > 0) || hasAccessoryAttempt;
+  const braceletInput = memoryHints?.braceletAcquisition || {};
+  const hasBraceletAttempt = Boolean(modules.accessory) && ['base_purchased', 'self_obtained'].includes(braceletInput.mode) && memoryNumber(braceletInput.attempts) !== null && memoryNumber(braceletInput.attempts) > 0;
+  return (Boolean(modules.equipment) && records.length > 0) || (Boolean(modules.abilityStone) && attempts !== null && attempts > 0) || hasAccessoryAttempt || hasBraceletAttempt;
 }
 
 function buildMemoryReport(result, memoryHints = {}) {
@@ -519,11 +606,14 @@ function buildMemoryReport(result, memoryHints = {}) {
   const stone = clamp(stoneAnalysis.score, 0, 100);
   const accessoryAnalysis = buildAccessoryMemoryAnalysis(result, memoryHints, accessoryEnabled);
   const accessory = clamp(accessoryAnalysis.score, 0, 35);
+  const braceletAnalysis = buildBraceletMemoryAnalysis(result, memoryHints, accessoryEnabled);
+  const bracelet = clamp(braceletAnalysis.score, 0, 35);
 
   const parts = [
     { key: 'equipment', name: '장비 재련', score: Math.round(equipment), kind: equipmentAnalysis.label, detail: equipmentAnalysis.detail },
     { key: 'abilityStone', name: '어빌리티 스톤', score: Math.round(stone), kind: stoneAnalysis.label, detail: stoneAnalysis.detail },
-    { key: 'accessoryPolishing', name: '장신구 연마', score: Math.round(accessory), kind: accessoryAnalysis.label, detail: accessoryAnalysis.detail }
+    { key: 'accessoryPolishing', name: '장신구 연마', score: Math.round(accessory), kind: accessoryAnalysis.label, detail: accessoryAnalysis.detail },
+    { key: 'braceletRandom', name: '팔찌', score: Math.round(bracelet), kind: braceletAnalysis.label, detail: braceletAnalysis.detail }
   ];
 
   const offsetParts = [];
@@ -533,12 +623,16 @@ function buildMemoryReport(result, memoryHints = {}) {
   for (const item of accessoryAnalysis.offsetItems || []) {
     offsetParts.push({ key: item.key, name: '장신구 연마', score: Math.round(item.score), kind: item.kind, detail: item.detail });
   }
+  for (const item of braceletAnalysis.offsetItems || []) {
+    offsetParts.push({ key: item.key, name: '팔찌', score: Math.round(item.score), kind: item.kind, detail: item.detail });
+  }
 
-  const rawTotal = equipment + stone + accessory;
+  const rawTotal = equipment + stone + accessory + bracelet;
   const offsetTotal = offsetParts.reduce((sum, part) => sum + part.score, 0);
   let total = Math.round(clamp(rawTotal - offsetTotal, 0, 100));
   const accessoryExtreme = (accessoryAnalysis.items || []).some((item) => item.analysis?.extreme);
-  if (stoneAnalysis.extreme || accessoryExtreme) total = Math.max(total, 80);
+  const braceletExtreme = (braceletAnalysis.items || []).some((item) => item.analysis?.extreme);
+  if (stoneAnalysis.extreme || accessoryExtreme || braceletExtreme) total = Math.max(total, 80);
   const strongest = [...parts].filter((part) => part.score > 0).sort((a, b) => b.score - a.score)[0] || null;
 
   if (!evidence) {
@@ -555,21 +649,24 @@ function buildMemoryReport(result, memoryHints = {}) {
       evidence,
       stoneAnalysis,
       equipmentAnalysis,
-      accessoryAnalysis
+      accessoryAnalysis,
+      braceletAnalysis
     };
   }
 
   let verdict = '억까 단서 약함';
   let tone = 'stable';
   let oneLine = '입력한 기억만 보면 접을 만큼의 억까라고 단정하기는 어렵습니다.';
-  if (stoneAnalysis.extreme || accessoryExtreme || total >= 90) {
+  if (stoneAnalysis.extreme || accessoryExtreme || braceletExtreme || total >= 90) {
     verdict = '극단적 억까';
     tone = 'danger';
     oneLine = stoneAnalysis.extreme
       ? '어빌리티 스톤에서 극단적 초과 시도 단서가 감지되었습니다. 입력값이 사실이라면 이 구간만으로도 접을 만한 수준입니다.'
       : accessoryExtreme
         ? '장신구 직접 연마에서 극단적 초과 시도 단서가 감지되었습니다. 입력값이 사실이라면 강한 억까로 볼 수 있습니다.'
-        : '입력한 기억 기준으로 극단적인 억까 단서가 있습니다.';
+        : braceletExtreme
+          ? '팔찌 랜덤 옵션에서 극단적 초과 시도 단서가 감지되었습니다. 입력값이 사실이라면 강한 억까로 볼 수 있습니다.'
+          : '입력한 기억 기준으로 극단적인 억까 단서가 있습니다.';
   } else if (total >= 70) {
     verdict = '접을 만했음';
     tone = 'danger';
@@ -588,7 +685,7 @@ function buildMemoryReport(result, memoryHints = {}) {
     oneLine += ' 다만 기대보다 잘 나온 구간이 있어 일부 체감은 상쇄될 수 있습니다.';
   }
 
-  return { total, offsetTotal, scoreLabel: `${total}/100`, verdict, tone, oneLine, strongest, parts, offsetParts, evidence, stoneAnalysis, equipmentAnalysis, accessoryAnalysis };
+  return { total, offsetTotal, scoreLabel: `${total}/100`, verdict, tone, oneLine, strongest, parts, offsetParts, evidence, stoneAnalysis, equipmentAnalysis, accessoryAnalysis, braceletAnalysis };
 }
 
 function detectedAreaNamesFromReport(memoryReport) {
@@ -617,6 +714,7 @@ function MemoryInterpretation({ memoryHints, memoryReport }) {
         <PityRecordSummary records={records} disconnectedRecords={memoryReport.equipmentAnalysis.disconnectedRecords || []} />
         <span>스톤 시도 개수: <strong>{stoneAttempts === null ? '입력 안 함' : `${stoneAttempts.toLocaleString('ko-KR')}개`}</strong></span>
         <span>장신구 직접 연마 기록: <strong>{memoryReport.accessoryAnalysis?.items?.length || memoryReport.accessoryAnalysis?.offsetItems?.length ? `${(memoryReport.accessoryAnalysis.items?.length || 0) + (memoryReport.accessoryAnalysis.offsetItems?.length || 0)}건` : '없음'}</strong></span>
+        <span>팔찌 랜덤 옵션 기록: <strong>{memoryReport.braceletAnalysis?.items?.length || memoryReport.braceletAnalysis?.offsetItems?.length ? braceletModeLabel(memoryReport.braceletAnalysis.mode) : '없음'}</strong></span>
         <span>숫자 입력으로 감지된 의심 구간: <strong>{detectedAreaNamesFromReport(memoryReport)}</strong></span>
       </div>
       <p className="hint">장기백은 부위와 강화 구간을 기준으로 봅니다. 현재 캐릭터와 직접 연결되지 않는 구간은 참고 기록으로만 표시합니다.</p>
@@ -853,7 +951,7 @@ export default function ResultPanel({ result, memoryHints }) {
           </div>
           <div className="ekka-module-card blue-line">
             <div className="module-title-row"><strong>팔찌</strong><span>{result.modules?.accessory ? '핵심/보조/조건부 분리' : '분석 제외'}</span></div>
-            <p>{result.modules?.accessory ? '직업/역할 프리셋에 따라 팔찌 효과를 핵심 유효·보조 유효·조건부 옵션으로 나눠 표시합니다. v43에서는 획득 방식/시도 수를 받지 않으므로 억까 지수에는 넣지 않습니다.' : '비교 설정에서 장신구/팔찌가 선택되지 않았습니다.'}</p>
+            <p>{result.modules?.accessory ? '직업/역할 프리셋에 따라 팔찌 효과를 핵심 유효·보조 유효·조건부 옵션으로 나눠 표시합니다. 직접 돌린 팔찌는 시도 수를 기대값과 비교해 억까/상쇄 점수에 반영합니다.' : '비교 설정에서 장신구/팔찌가 선택되지 않았습니다.'}</p>
             <ul>
               <li>프리셋: {classPreset.engravingName ? `${classPreset.className} · ${classPreset.engravingName}` : (bracelet.role === 'support' ? '서포터' : '딜러')} · 등급 {bracelet.grade || '-'}</li>
               <li>핵심 유효 옵션: <EffectTagList items={bracelet.currentValidEffects || []} /></li>
@@ -861,6 +959,10 @@ export default function ResultPanel({ result, memoryHints }) {
               <li>조건부 옵션: <EffectTagList items={bracelet.currentConditionalEffects || []} /></li>
               <li>핵심/보조/조건부 합계: {(bracelet.currentValidLikeEffects || []).length}개</li>
               <li>유효 특수 1개 이상 기대: {number(bracelet.expectedAttemptsForValidSpecial)}회</li>
+              <li>팔찌 획득 방식: {braceletModeLabel(memoryHints?.braceletAcquisition?.mode)}</li>
+              <li>팔찌 입력 시도 수: {memoryNumber(memoryHints?.braceletAcquisition?.attempts) === null ? '입력 안 함' : `${number(memoryNumber(memoryHints?.braceletAcquisition?.attempts), 0)}개`}</li>
+              <li>팔찌 시도 판정: {memoryReport.braceletAnalysis?.label || '-'}</li>
+              <li>{memoryReport.braceletAnalysis?.detail || '팔찌를 직접 돌렸다면 시도 수를 입력해 기대값과 비교할 수 있습니다.'}</li>
             </ul>
           </div>
         </div>

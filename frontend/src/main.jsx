@@ -24,7 +24,8 @@ function App() {
   const [memoryHints, setMemoryHints] = useState({
     pityRecords: [{ part: 'unknown', target: 'unknown' }],
     stoneAttempts: '',
-    accessoryAcquisitions: {}
+    accessoryAcquisitions: {},
+    braceletAcquisition: { mode: 'unknown', attempts: '' }
   });
 
   useEffect(() => {
@@ -51,7 +52,11 @@ function App() {
         nextAcq[row.key] = currentAcq[row.key] || { mode: 'unknown', attempts: '' };
       });
       const acqChanged = JSON.stringify(currentAcq) !== JSON.stringify(nextAcq);
-      if (changed || acqChanged) return { ...prev, pityRecords: next, accessoryAcquisitions: nextAcq };
+      const hasBracelet = (character?.accessories || []).some((item) => item.slot === '팔찌');
+      const currentBracelet = prev.braceletAcquisition || { mode: 'unknown', attempts: '' };
+      const nextBracelet = hasBracelet ? currentBracelet : { mode: 'unknown', attempts: '' };
+      const braceletChanged = JSON.stringify(currentBracelet) !== JSON.stringify(nextBracelet);
+      if (changed || acqChanged || braceletChanged) return { ...prev, pityRecords: next, accessoryAcquisitions: nextAcq, braceletAcquisition: nextBracelet };
       return prev;
     });
   }, [character]);
@@ -273,6 +278,22 @@ function App() {
       .filter((item) => item.slot !== '팔찌');
   }
 
+  function braceletRow(sourceCharacter = character) {
+    const accessories = sourceCharacter?.accessories || [];
+    const item = accessories.find((row) => row.slot === '팔찌');
+    return item ? { ...item, key: 'bracelet' } : null;
+  }
+
+  function updateBraceletAcquisition(field, value) {
+    setMemoryHints((prev) => {
+      const before = prev.braceletAcquisition || { mode: 'unknown', attempts: '' };
+      const next = field === 'mode' && !['base_purchased', 'self_obtained'].includes(value)
+        ? { ...before, [field]: value, attempts: '' }
+        : { ...before, [field]: value };
+      return { ...prev, braceletAcquisition: next };
+    });
+  }
+
   function updateAccessoryAcquisition(key, field, value) {
     setMemoryHints((prev) => {
       const current = prev.accessoryAcquisitions || {};
@@ -286,7 +307,7 @@ function App() {
     <main className="container">
       <header className="hero ekka-hero">
         <div>
-          <p className="eyebrow">LOA-HSI v45</p>
+          <p className="eyebrow">LOA-HSI v46</p>
           <h1>내가 접을 만했나? 로스트아크 성장 억까 리포트</h1>
           <p className="hero-copy">핵심 결론만 먼저 보여주고, 자세한 계산은 필요할 때 펼쳐보는 리포트입니다.</p>
         </div>
@@ -421,6 +442,34 @@ function App() {
               {!accessoryRows().length && <p className="hint">조회된 장신구가 없습니다.</p>}
             </div>
           </div>
+
+          <div className={`accessory-acquisition-panel ${modules.accessory ? '' : 'disabled-panel'}`}>
+            <div>
+              <h3>팔찌 랜덤 옵션 시도</h3>
+              <p className="hint">팔찌는 완성품 구매가 아니라 베이스 팔찌를 산 뒤 랜덤 옵션을 직접 돌리는 구조로 봅니다. 직접 돌린 경우에만 시도 수를 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>
+            </div>
+            {braceletRow() ? (
+              <div className="accessory-acquisition-row">
+                <div className="accessory-acquisition-name">
+                  <strong>팔찌</strong>
+                  <small>{braceletRow()?.name || '팔찌'} · {braceletRow()?.grade || '-'}</small>
+                </div>
+                <select disabled={!modules.accessory} value={memoryHints.braceletAcquisition?.mode || 'unknown'} onChange={(e) => updateBraceletAcquisition('mode', e.target.value)}>
+                  <option value="unknown">기억 안 남</option>
+                  <option value="base_purchased">베이스 팔찌 구매 후 직접 돌림</option>
+                  <option value="self_obtained">직접 획득한 팔찌를 돌림</option>
+                </select>
+                {['base_purchased', 'self_obtained'].includes(memoryHints.braceletAcquisition?.mode) && (
+                  <label className="inline-attempt-input">
+                    <input type="number" min="0" step="1" disabled={!modules.accessory} value={memoryHints.braceletAcquisition?.attempts || ''} onChange={(e) => updateBraceletAcquisition('attempts', e.target.value)} placeholder="시도 수" />
+                    <span>개</span>
+                  </label>
+                )}
+              </div>
+            ) : (
+              <p className="hint">조회된 팔찌가 없습니다.</p>
+            )}
+          </div>
         </div>
 
         <button className="primary" onClick={runReport} disabled={loading}>{loading ? '분석 중...' : '억까 리포트 생성'}</button>
@@ -432,6 +481,7 @@ function App() {
         <details className="notice-panel footer-notice-panel">
           <summary>공지사항 / 업데이트 내역</summary>
           <div className="notice-list version-history-list">
+            <p><strong>v46</strong> 팔찌 획득 방식을 베이스 구매/직접 획득 후 랜덤 옵션 시도 구조로 정리하고, 직접 돌린 팔찌는 시도 수를 기대값과 비교해 억까/상쇄 점수에 반영했습니다.</p>
             <p><strong>v45</strong> 계산 근거 영역을 표 중심에서 모바일 친화 카드형으로 정리하고, 모바일 화면 레이아웃을 보강했습니다.</p>
             <p><strong>v44</strong> 장신구별 획득 방식을 추가했습니다. 직접 연마한 장신구는 시도 수를 입력하면 공식 연마 확률표 기반 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>
             <p><strong>v43</strong> 최종 억까 지수 공식을 장비+스톤 중심으로 정리하고, 상쇄 단서를 최종 점수에서 차감하도록 수정했습니다. 장신구 공식 연마 확률표를 로컬 데이터로 추가했습니다.</p>
