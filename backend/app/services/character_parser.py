@@ -7,8 +7,15 @@ from typing import Any
 from app.models.schemas import AbilityStoneSummary, CharacterSummary, EquipmentItem
 from app.utils.tooltip import first_float, first_int, normalize_text, parse_tooltip
 
+UNKNOWN_LABEL = "알 수 없음"
+ABILITY_STONE_LABEL = "어빌리티 스톤"
+ITEM_LEVEL_LABEL = "아이템 레벨"
+FIXED_EFFECT_LABEL = "고정 효과"
+ASSIGNED_EFFECT_LABEL = "부여 효과"
+SKILL_COOLDOWN_TEXT = "스킬 재사용 대기시간"
+
 ACCESSORY_TYPES = {"목걸이", "귀걸이", "반지", "팔찌"}
-STONE_TYPES = {"어빌리티 스톤"}
+STONE_TYPES = {ABILITY_STONE_LABEL}
 GEAR_TYPES = {"무기", "투구", "상의", "하의", "장갑", "어깨", "견갑"}
 EXCLUDED_EQUIPMENT_TYPES = {"나침반", "부적", "보주"}
 
@@ -17,6 +24,26 @@ STONE_SKIP_WORDS = [
     "Element", "value", "leftStr", "rightStr", "contentStr", "아이템", "효과", "툴팁", "거래", "가능", "품질",
     "어빌리티", "스톤", "등급", "레벨", "세공", "확률", "성공", "실패", "활성도", "기본", "추가",
 ]
+
+MAX_REGEX_TEXT = 12000
+MAX_LINE_TEXT = 240
+PERCENT_VALUE_PATTERN = re.compile(r"([+＋-]?\d+(?:\.\d+)?)\s*%")
+NUMBER_TOKEN_PATTERN = re.compile(r"[+＋-]?\d+(?:\.\d+)?\s*%?")
+SIMPLE_NUMBER_PATTERN = re.compile(r"\d+(?:\.\d+)?")
+GRADE_PREFIX_PATTERN = re.compile(r"^([상중하])\s*(.{1,160})$")
+GRADE_VALUE_PREFIX_PATTERN = re.compile(r"^([상중하])\s+(.{1,80})\s*([+＋-]?\d[\d,]*(?:\.\d+)?%?)$")
+
+
+def _bounded_text(value: Any, limit: int = MAX_REGEX_TEXT) -> str:
+    return normalize_text(value)[:limit]
+
+
+def _percent_values(text: str, limit: int = MAX_LINE_TEXT) -> list[str]:
+    return [value.lstrip("+＋") for value in PERCENT_VALUE_PATTERN.findall(text[:limit])]
+
+
+def _number_tokens(text: str, limit: int = MAX_LINE_TEXT) -> list[str]:
+    return NUMBER_TOKEN_PATTERN.findall(text[:limit])
 
 
 
@@ -37,7 +64,7 @@ BRACELET_EFFECT_KEYWORDS = [
 ]
 
 
-BRACELET_SECTION_TITLES = ["팔찌 부여 효과 상세", "고정 효과", "부여 효과"]
+BRACELET_SECTION_TITLES = ["팔찌 부여 효과 상세", FIXED_EFFECT_LABEL, ASSIGNED_EFFECT_LABEL]
 
 
 def _htmlish_lines(value: Any) -> list[str]:
@@ -64,41 +91,41 @@ def _normalize_bracelet_line(text: str, section: str | None = None) -> str:
     text = re.sub(r'^(고정 효과|부여 효과)\s*[:：-]?\s*', '', text)
 
     # Compact common long descriptions but preserve the key value.
-    text = text.replace('스킬의 재사용 대기 시간이', '스킬 재사용 대기시간')
-    text = text.replace('스킬의 재사용 대기시간이', '스킬 재사용 대기시간')
+    text = text.replace('스킬의 재사용 대기 시간이', SKILL_COOLDOWN_TEXT)
+    text = text.replace('스킬의 재사용 대기시간이', SKILL_COOLDOWN_TEXT)
     text = text.replace('적에게 주는 피해가 증가', '피해 증가')
     text = text.replace('공격에 의한 스킬이 적에게 주는 피해가 증가', '공격 피해 증가')
     text = text.replace('가 적용되지 않는다', ' 미적용')
     text = text.replace('는 적용되지 않는다', ' 미적용')
 
     # Normalize stat lines.
-    m = re.match(r'^(상|중|하)\s*(치명|특화|신속|제압|인내|숙련|힘|민첩|지능|체력|최대 생명력|공격력|무기 공격력)\s*([+＋-]?\d[\d,]*(?:\.\d+)?%?)$', text)
+    m = GRADE_VALUE_PREFIX_PATTERN.match(text[:MAX_LINE_TEXT])
     if m:
         return f"{m.group(1)} {m.group(2)} {m.group(3)}"
 
     # Keep labelled effect lines like '중 무기 공격력 +8100' or long special descriptions.
-    m = re.match(r'^(상|중|하)\s*(.+)$', text)
+    m = GRADE_PREFIX_PATTERN.match(text[:MAX_LINE_TEXT])
     if m:
         grade, body = m.group(1), m.group(2).strip()
         body = re.sub(r'\s+', ' ', body)
         # Shorten a few very long descriptions while keeping meaning.
-        if '스킬 재사용 대기시간' in body and '피해 증가' in body:
-            nums = re.findall(r'(\d+(?:\.\d+)?)\s*%', body)
+        if SKILL_COOLDOWN_TEXT in body and '피해 증가' in body:
+            nums = _percent_values(body)
             if len(nums) >= 2:
                 body = f"스킬 재사용 대기시간 {nums[0]}% / 피해 증가 {nums[1]}%"
         elif '방랑형 공격' in body and '피해' in body:
-            nums = re.findall(r'(\d+(?:\.\d+)?)\s*%', body)
+            nums = _percent_values(body)
             if nums:
                 body = f"방랑형 공격 피해 증가 {nums[0]}%"
         elif len(body) > 70:
             # Try to preserve first meaningful phrase and any nearby percentage.
-            nums = re.findall(r'(\d+(?:\.\d+)?)\s*%', body)
+            nums = _percent_values(body)
             first = body[:46].rstrip(' ,')
             body = f"{first}{(' ' + nums[0] + '%') if nums else ''}"
         return f"{grade} {body}"
 
     # Section-prefixed fallback when useful.
-    if section in {'고정 효과', '부여 효과'} and any(k in text for k in BRACELET_EFFECT_KEYWORDS):
+    if section in {FIXED_EFFECT_LABEL, ASSIGNED_EFFECT_LABEL} and any(k in text for k in BRACELET_EFFECT_KEYWORDS):
         return text
     return text
 
@@ -113,7 +140,7 @@ def _extract_bracelet_effects_from_sections(tooltip_obj: dict[str, Any]) -> list
             return
         if line in BRACELET_SECTION_TITLES:
             return
-        if any(skip in line for skip in ['거래', '분해', '판매', '착용', '귀속', '아이템 레벨', '품질', '세공', '재련']):
+        if any(skip in line for skip in ['거래', '분해', '판매', '착용', '귀속', ITEM_LEVEL_LABEL, '품질', '세공', '재련']):
             return
         if line not in effects:
             effects.append(line)
@@ -127,14 +154,14 @@ def _extract_bracelet_effects_from_sections(tooltip_obj: dict[str, Any]) -> list
                 if line != '팔찌 부여 효과 상세':
                     current_section = line
                 continue
-            if '고정 효과' == line or line.startswith('고정 효과'):
-                current_section = '고정 효과'
+            if FIXED_EFFECT_LABEL == line or line.startswith(FIXED_EFFECT_LABEL):
+                current_section = FIXED_EFFECT_LABEL
                 continue
-            if '부여 효과' == line or line.startswith('부여 효과'):
-                current_section = '부여 효과'
+            if ASSIGNED_EFFECT_LABEL == line or line.startswith(ASSIGNED_EFFECT_LABEL):
+                current_section = ASSIGNED_EFFECT_LABEL
                 continue
             # Accept only lines that resemble bracelet effects.
-            if re.match(r'^(상|중|하)\s*', line) or any(k in line for k in BRACELET_EFFECT_KEYWORDS):
+            if (line[:1] in '상중하') or any(k in line for k in BRACELET_EFFECT_KEYWORDS):
                 add(line)
     return effects
 
@@ -149,7 +176,7 @@ ACCESSORY_POLISH_EFFECT_KEYWORDS = [
 
 
 def _clean_accessory_effect_text(value: Any) -> str:
-    text = normalize_text(value)
+    text = _bounded_text(value, MAX_LINE_TEXT)
     if not text:
         return ""
     text = re.sub(r"^(?:Element_\d+|value|leftStr|rightStr|contentStr|topStr)\s*", "", text)
@@ -163,7 +190,7 @@ def _normalize_accessory_effect_line(text: str) -> str:
     text = _clean_accessory_effect_text(text)
     if not text:
         return ""
-    if any(skip in text for skip in ["아이템 레벨", "품질", "거래", "분해", "판매", "착용", "귀속", "아크 패시브", "깨달음"]):
+    if any(skip in text for skip in [ITEM_LEVEL_LABEL, "품질", "거래", "분해", "판매", "착용", "귀속", "아크 패시브", "깨달음"]):
         return ""
     text = text.replace("적에게 주는 피해가", "피해")
     text = text.replace("증가합니다", "증가")
@@ -175,10 +202,10 @@ def _normalize_accessory_effect_line(text: str) -> str:
     text = re.sub(r"\s+", " ", text).strip()
 
     # Keep short grade-prefixed effect lines, e.g. '상 추가 피해 +2.60%'.
-    m = re.match(r"^(상|중|하)\s*(.+)$", text)
+    m = GRADE_PREFIX_PATTERN.match(text[:MAX_LINE_TEXT])
     if m:
         grade, body = m.group(1), m.group(2).strip()
-        nums = re.findall(r"[+＋-]?\d+(?:\.\d+)?\s*%?", body)
+        nums = _number_tokens(body)
         # Long descriptions are shortened but keep one key number.
         if len(body) > 80:
             key = next((k for k in ACCESSORY_POLISH_EFFECT_KEYWORDS if k in body), body[:28])
@@ -189,7 +216,7 @@ def _normalize_accessory_effect_line(text: str) -> str:
     if not any(k in text for k in ACCESSORY_POLISH_EFFECT_KEYWORDS):
         return ""
     if len(text) > 90:
-        nums = re.findall(r"[+＋-]?\d+(?:\.\d+)?\s*%?", text)
+        nums = _number_tokens(text)
         key = next((k for k in ACCESSORY_POLISH_EFFECT_KEYWORDS if k in text), text[:28])
         return f"{key} {nums[0]}" if nums else key
     return text
@@ -213,7 +240,7 @@ def _extract_accessory_polish_effects(tooltip_obj: dict[str, Any], tooltip_text:
             if any(k in normalize_text(line) for k in ACCESSORY_POLISH_EFFECT_KEYWORDS + ["연마"]):
                 add(line)
 
-    text_full = normalize_text(tooltip_text)
+    text_full = _bounded_text(tooltip_text)
     # Fallback patterns for common T4 accessory polishing effect lines.
     patterns = [
         r"(상|중|하)\s*([^|{}\[\]]{0,40}?(?:추가 피해|피해|무기 공격력|공격력|치명타 적중률|치명타 피해|낙인력|아군 공격력|아군 피해|보호막|최대 생명력)[^|{}\[\]]{0,45})",
@@ -246,7 +273,7 @@ def _extract_accessory_polish_effects(tooltip_obj: dict[str, Any], tooltip_text:
 
 
 def _clean_bracelet_effect_text(value: Any) -> str:
-    text = normalize_text(value)
+    text = _bounded_text(value, MAX_LINE_TEXT)
     if not text:
         return ""
     # Remove common label noise from tooltip JSON blocks.
@@ -264,7 +291,7 @@ def _compact_special_effect(text: str) -> str:
     '순환: ... 30초마다 ...'. Showing that entire sentence makes the table unreadable,
     so we compress it to '순환' or '순환 3.5%' when a nearby numeric value exists.
     """
-    clean = _clean_bracelet_effect_text(text)
+    clean = _clean_bracelet_effect_text(text[:MAX_LINE_TEXT])
     if not clean:
         return ""
     for name in BRACELET_SPECIAL_EFFECTS:
@@ -273,7 +300,7 @@ def _compact_special_effect(text: str) -> str:
             continue
         window = clean[idx: idx + 90]
         grade_match = re.search(rf"{re.escape(name)}\s*([상중하])", window)
-        pct_match = re.search(r"([0-9]+(?:\.\d+)?)\s*%", window)
+        pct_match = PERCENT_VALUE_PATTERN.search(window)
         if grade_match and pct_match:
             return f"{name} {grade_match.group(1)} {pct_match.group(1)}%"
         if grade_match:
@@ -297,7 +324,7 @@ def _extract_bracelet_effects(tooltip_obj: dict[str, Any], tooltip_text: str) ->
         if not text:
             return
         if any(skip in text for skip in [
-            "아이템 레벨", "품질", "거래", "분해", "판매", "착용", "귀속",
+            ITEM_LEVEL_LABEL, "품질", "거래", "분해", "판매", "착용", "귀속",
             "팔찌 효과 부여", "효과 변환", "새겨진", "세공", "재련", "장착",
         ]):
             return
@@ -326,7 +353,7 @@ def _extract_bracelet_effects(tooltip_obj: dict[str, Any], tooltip_text: str) ->
             add_effect(value)
 
     # Regex fallbacks from the full normalized tooltip text.
-    text = normalize_text(tooltip_text)
+    text = _bounded_text(tooltip_text)
     stat_pattern = r"(치명|특화|신속|제압|인내|숙련|힘|민첩|지능|체력|최대 생명력|공격력|무기 공격력)\s*[+＋]?\s*([0-9,]+(?:\.\d+)?)"
     for m in re.finditer(stat_pattern, text):
         add_effect(f"{m.group(1)} +{m.group(2)}")
@@ -347,7 +374,7 @@ def _num_from_level(value: Any) -> float | None:
     if value is None:
         return None
     text = str(value).replace(",", "")
-    m = re.search(r"(\d+(?:\.\d+)?)", text)
+    m = SIMPLE_NUMBER_PATTERN.search(text[:MAX_LINE_TEXT])
     if not m:
         return None
     return float(m.group(1))
@@ -380,7 +407,7 @@ def _extract_quality(tooltip_obj: dict[str, Any], tooltip_text: str) -> int | No
             if 0 <= ivalue <= 100:
                 candidates.append(ivalue)
         if isinstance(value, str) and ("quality" in key_l or "품질" in str(key)):
-            m = re.search(r"(\d{1,3})", value)
+            m = re.search(r"\d{1,3}", value[:MAX_LINE_TEXT])
             if m:
                 ivalue = int(m.group(1))
                 if 0 <= ivalue <= 100:
@@ -434,9 +461,9 @@ def _normalize_slot(slot: str, name: Any = None) -> str:
 
     # Ability stone must be checked before armor words.
     if "어빌리티" in slot_text and "스톤" in slot_text:
-        return "어빌리티 스톤"
-    if slot_text in {"어빌리티 스톤", "스톤"}:
-        return "어빌리티 스톤"
+        return ABILITY_STONE_LABEL
+    if slot_text in {ABILITY_STONE_LABEL, "스톤"}:
+        return ABILITY_STONE_LABEL
 
     # Exact/slot-field based matching for normal gear.
     if "무기" in slot_text:
@@ -472,9 +499,9 @@ def _normalize_slot(slot: str, name: Any = None) -> str:
     # Fallback: stone names commonly end with 돌, but avoid using name text
     # for armor/accessory words because names can contain misleading substrings.
     if name_text.endswith("돌") and ("스톤" in slot_text or "어빌리티" in slot_text or not slot_text):
-        return "어빌리티 스톤"
+        return ABILITY_STONE_LABEL
 
-    return slot_text or "알 수 없음"
+    return slot_text or UNKNOWN_LABEL
 
 
 def _extract_honing_level(name: Any, tooltip_text: str) -> int | None:
@@ -488,7 +515,7 @@ def _extract_honing_level(name: Any, tooltip_text: str) -> int | None:
                 return value
 
     # Tooltip에서는 반드시 재련/강화 문맥이 있는 숫자만 사용한다.
-    text = normalize_text(tooltip_text)
+    text = _bounded_text(tooltip_text)
     patterns = [
         r"재련\s*단계[^0-9+＋]{0,12}[+＋]?(\d{1,2})",
         r"강화\s*단계[^0-9+＋]{0,12}[+＋]?(\d{1,2})",
@@ -504,7 +531,7 @@ def _extract_honing_level(name: Any, tooltip_text: str) -> int | None:
 
 
 def _extract_item_level(tooltip_text: str) -> float | None:
-    text = normalize_text(tooltip_text)
+    text = _bounded_text(tooltip_text)
     patterns = [
         r"아이템\s*레벨[^0-9]*(\d+(?:\.\d+)?)",
         r"Item\s*Level[^0-9]*(\d+(?:\.\d+)?)",
@@ -513,7 +540,7 @@ def _extract_item_level(tooltip_text: str) -> float | None:
     return first_float(patterns, text)
 
 def parse_equipment_item(raw: dict[str, Any]) -> EquipmentItem:
-    raw_slot = str(_pick(raw, "Type", "type") or "알 수 없음")
+    raw_slot = str(_pick(raw, "Type", "type") or UNKNOWN_LABEL)
     name = _pick(raw, "Name", "name")
     slot = _normalize_slot(raw_slot, name)
     grade = _pick(raw, "Grade", "grade")
@@ -565,7 +592,7 @@ def _dedupe_pairs(pairs: list[tuple[str, int]]) -> list[tuple[str, int]]:
 
 
 def _parse_stone_pairs_from_text(text: str) -> list[tuple[str, int]]:
-    text = normalize_text(text)
+    text = _bounded_text(text)
     if not text:
         return []
 
@@ -584,7 +611,7 @@ def _parse_stone_pairs_from_text(text: str) -> list[tuple[str, int]]:
     for pattern in patterns:
         for m in re.finditer(pattern, text):
             context = text[max(0, m.start() - 80):m.end() + 80]
-            if any(bad in context for bad in ["품질", "아이템 레벨", "티어", "거래", "초월", "연마", "구매", "판매"]):
+            if any(bad in context for bad in ["품질", ITEM_LEVEL_LABEL, "티어", "거래", "초월", "연마", "구매", "판매"]):
                 continue
             pairs.append((m.group(1), int(m.group(2))))
 
@@ -600,7 +627,7 @@ def _parse_stone_pairs_from_text(text: str) -> list[tuple[str, int]]:
         context = text[max(0, m.start() - 90):m.end() + 40]
         if not any(ok in context for ok in ["각인", "활성", "어빌리티", "스톤"]):
             continue
-        if any(bad in context for bad in ["품질", "아이템 레벨", "티어", "거래", "초월", "연마"]):
+        if any(bad in context for bad in ["품질", ITEM_LEVEL_LABEL, "티어", "거래", "초월", "연마"]):
             continue
         pairs.append((m.group(1), int(m.group(2))))
 
@@ -657,7 +684,7 @@ def _extract_stone_points_fallback(raw_text: str) -> tuple[list[int], int | None
     로아 API의 Tooltip은 캐릭터/시점별로 HTML, JSON, leftStr/rightStr 구조가 조금씩 다릅니다.
     서비스 계산에는 각인 이름보다 포인트 조합이 중요하므로, 활성도 숫자만 안정적으로 뽑습니다.
     """
-    text = normalize_text(raw_text)
+    text = _bounded_text(raw_text)
     positive: list[int] = []
     negative: list[int] = []
     for m in re.finditer(r"(?:활성도|활성\s*포인트|포인트)\s*[+＋]?\s*(\d{1,2})", text):
@@ -677,7 +704,7 @@ def _extract_stone_points_fallback(raw_text: str) -> tuple[list[int], int | None
             context = text[max(0, m.start() - 120):m.end() + 80]
             if point > 10 or not any(ok in context for ok in ["어빌리티", "스톤", "각인", "활성"]):
                 continue
-            if any(bad in context for bad in ["품질", "아이템 레벨", "거래", "연마", "초월"]):
+            if any(bad in context for bad in ["품질", ITEM_LEVEL_LABEL, "거래", "연마", "초월"]):
                 continue
             if any(word in context for word in NEGATIVE_WORDS):
                 negative.append(point)
@@ -825,7 +852,7 @@ def build_character_summary(bundle: dict[str, Any], raw_saved_path: str | None =
         warnings.append("장신구 정보를 찾지 못했습니다. 캐릭터 공개 정보 또는 API 응답을 확인하세요.")
 
     return CharacterSummary(
-        character_name=_pick(profile, "CharacterName", "characterName") or "알 수 없음",
+        character_name=_pick(profile, "CharacterName", "characterName") or UNKNOWN_LABEL,
         server_name=_pick(profile, "ServerName", "serverName"),
         class_name=_pick(profile, "CharacterClassName", "characterClassName"),
         item_avg_level=_num_from_level(_pick(profile, "ItemAvgLevel", "itemAvgLevel")),

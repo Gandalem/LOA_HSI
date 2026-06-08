@@ -12,11 +12,11 @@ RUN npm run build \
     && test -f /app/frontend/dist/index.html \
     && ls -la /app/frontend/dist
 
-FROM nginx:1.27-alpine
-RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/default.conf
-COPY --from=build /app/frontend/dist/ /usr/share/nginx/html/
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+FROM nginxinc/nginx-unprivileged:1.27-alpine
+COPY --chown=101:101 --from=build /app/frontend/dist/ /usr/share/nginx/html/
+COPY --chown=101:101 nginx.conf /etc/nginx/conf.d/default.conf
 RUN test -f /usr/share/nginx/html/index.html \
     && ls -la /usr/share/nginx/html
-EXPOSE 80
+USER 101
+EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]

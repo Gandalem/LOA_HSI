@@ -307,7 +307,7 @@ function App() {
     <main className="container">
       <header className="hero ekka-hero">
         <div>
-          <p className="eyebrow">LOA-HSI v46</p>
+          <p className="eyebrow">LOA-HSI v47</p>
           <h1>내가 접을 만했나? 로스트아크 성장 억까 리포트</h1>
           <p className="hero-copy">핵심 결론만 먼저 보여주고, 자세한 계산은 필요할 때 펼쳐보는 리포트입니다.</p>
         </div>
@@ -481,6 +481,7 @@ function App() {
         <details className="notice-panel footer-notice-panel">
           <summary>공지사항 / 업데이트 내역</summary>
           <div className="notice-list version-history-list">
+            <p><strong>v47</strong> SonarCloud 1차 정리로 정규식 입력 길이 제한/공통 추출 헬퍼를 추가하고, 항상 참 조건·mutable default 의심 지점·Docker root 실행 경고를 보완했습니다.</p>
             <p><strong>v46</strong> 팔찌 획득 방식을 베이스 구매/직접 획득 후 랜덤 옵션 시도 구조로 정리하고, 직접 돌린 팔찌는 시도 수를 기대값과 비교해 억까/상쇄 점수에 반영했습니다.</p>
             <p><strong>v45</strong> 계산 근거 영역을 표 중심에서 모바일 친화 카드형으로 정리하고, 모바일 화면 레이아웃을 보강했습니다.</p>
             <p><strong>v44</strong> 장신구별 획득 방식을 추가했습니다. 직접 연마한 장신구는 시도 수를 입력하면 공식 연마 확률표 기반 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>

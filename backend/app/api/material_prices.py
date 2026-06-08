@@ -107,13 +107,14 @@ def latest_material_prices() -> MaterialPriceResponse:
 
 
 @router.post("/ensure", response_model=MaterialPriceResponse)
-def ensure_material_prices(req: CollectMaterialPricesRequest = CollectMaterialPricesRequest(forceRefresh=False)) -> MaterialPriceResponse:
+def ensure_material_prices(req: CollectMaterialPricesRequest | None = None) -> MaterialPriceResponse:
     """첫 화면용 시세 보장 엔드포인트.
 
     - 유효한 DB 시세가 있으면 그대로 반환합니다.
     - DB가 비어 있거나 TTL이 지난 경우에만 거래소 API를 호출합니다.
     - 프론트에서 'DB 시세 확인' 버튼을 누르지 않아도 첫 접속 시 자동으로 시세가 준비됩니다.
     """
+    req = req or CollectMaterialPricesRequest(forceRefresh=False)
     req.forceRefresh = False
     if req.ttlMinutes <= 0:
         req.ttlMinutes = 360
@@ -121,7 +122,8 @@ def ensure_material_prices(req: CollectMaterialPricesRequest = CollectMaterialPr
 
 
 @router.post("/collect", response_model=MaterialPriceResponse)
-def collect_material_prices(req: CollectMaterialPricesRequest = CollectMaterialPricesRequest()) -> MaterialPriceResponse:
+def collect_material_prices(req: CollectMaterialPricesRequest | None = None) -> MaterialPriceResponse:
+    req = req or CollectMaterialPricesRequest()
     items = req.items or []
     if req.useConfigFile:
         # 요청으로 items가 들어오면 그것만 쓰고, 비어 있으면 config/material_items.json 사용.

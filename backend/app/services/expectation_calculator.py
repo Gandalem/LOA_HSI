@@ -138,7 +138,6 @@ def _bracelet_effect_buckets(effects: list[str], role: str, class_preset: dict[s
                 or "아군 공격력 강화" in e
                 or "아군 피해량 강화" in e
                 or "치명타 저항" in e
-                or ("치명타 저항" in e and any(x in named for x in ["비수", "약점 노출"]))
                 or ("아군 공격력 강화" in e and "응원" in named)
                 or "낙인" in e
                 or "특화 +" in e
@@ -249,8 +248,10 @@ def _character_role(character: CharacterSummary) -> str:
 
 
 def _attempts_for_at_least_once(prob: float, target_probability: float) -> float | None:
-    if prob <= 0 or prob >= 1:
-        return None if prob <= 0 else 1.0
+    if prob <= 0:
+        return None
+    if prob >= 1:
+        return 1.0
     return log(1.0 - target_probability) / log(1.0 - prob)
 
 

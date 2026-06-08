@@ -129,7 +129,7 @@ class LostArkClient:
             return None
         return {
             "profile": profile,
-            "equipment": equipment or [],
+            "equipment": equipment,
             "engravings": data.get("ArmoryEngraving"),
             "arkpassive": data.get("ArkPassive"),
             "_source": "armory_total_info",
@@ -154,7 +154,7 @@ class LostArkClient:
         arkpassive = self._get(f"/armories/characters/{encoded_name}/arkpassive", optional=True)
         return {
             "profile": profile,
-            "equipment": equipment or [],
+            "equipment": equipment,
             "engravings": engravings,
             "arkpassive": arkpassive,
             "_source": "separate_endpoints",

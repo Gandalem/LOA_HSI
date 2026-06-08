@@ -6,10 +6,15 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 COPY requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && addgroup --system --gid 10001 app \
+    && adduser --system --uid 10001 --ingroup app app \
+    && mkdir -p /app/data /app/backend
 
-COPY app ./app
-COPY config ./config
+COPY --chown=app:app app ./app
+COPY --chown=app:app config ./config
+RUN chown -R app:app /app/backend /app/data
 
+USER app
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
