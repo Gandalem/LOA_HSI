@@ -2,9 +2,39 @@ from __future__ import annotations
 
 from functools import lru_cache
 from math import log
+from pathlib import Path
 from typing import Any
+import json
 
 from app.models.schemas import CharacterSummary
+
+
+
+def _config_dir() -> Path:
+    path = Path(__file__).resolve().parents[2] / "config"
+    if path.exists():
+        return path
+    return Path("/app/backend/config")
+
+
+@lru_cache(maxsize=1)
+def _official_accessory_polishing_table() -> dict[str, Any]:
+    path = _config_dir() / "accessory_polishing_probabilities_official.json"
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _official_accessory_polishing_summary() -> dict[str, Any]:
+    table = _official_accessory_polishing_table()
+    parts = table.get("parts") or {}
+    return {
+        "metadata": table.get("metadata") or {},
+        "gradeProbabilities": table.get("gradeProbabilities") or ACCESSORY_POLISHING_DISPLAY_PROBS,
+        "partOptionCounts": {part: len(options) for part, options in parts.items()},
+        "parts": parts,
+        "loaded": bool(table),
+    }
 
 # 확률 페이지/커뮤니티 검증값을 런타임에 매번 조회하지 않기 위해 로컬 규칙으로 고정합니다.
 # 공식 확률 페이지는 각 옵션별 10회 세공, 성공 횟수별 레벨 환산, 장신구 중복 제외, 팔찌 T4 효과 수/카테고리 확률을 공개합니다.
@@ -540,9 +570,11 @@ def build_expected_value_summary(character: CharacterSummary, stone_price_gold: 
         "accessoryPolishing": {
             "single_slot": _accessory_single_slot(),
             "combination": _accessory_combo_expectation(character, class_preset),
+            "officialProbabilityTable": _official_accessory_polishing_summary(),
             "duplicateRule": "이미 부여된 효과가 제외되면 실제 확률 = 표기확률 / (100% - 제외된 효과 표기확률 합)으로 보정합니다.",
+            "scoreRule": "v43에서는 장신구 획득 방식/직접 연마 시도 수 입력을 아직 받지 않으므로 억까 지수에는 반영하지 않고 공식 확률표만 로컬 데이터로 보관합니다.",
         },
         "braceletT4": _bracelet_target_expectation(character, class_preset),
         "classEngravingPreset": class_preset,
-        "presetVersion": "v34-class-engraving-auto-material",
+        "presetVersion": "v43-official-accessory-probabilities",
     }

@@ -262,7 +262,7 @@ function App() {
     <main className="container">
       <header className="hero ekka-hero">
         <div>
-          <p className="eyebrow">LOA-HSI v42</p>
+          <p className="eyebrow">LOA-HSI v43</p>
           <h1>내가 접을 만했나? 로스트아크 성장 억까 리포트</h1>
           <p className="hero-copy">핵심 결론만 먼저 보여주고, 자세한 계산은 필요할 때 펼쳐보는 리포트입니다.</p>
         </div>
@@ -376,6 +376,7 @@ function App() {
         <details className="notice-panel footer-notice-panel">
           <summary>공지사항 / 업데이트 내역</summary>
           <div className="notice-list version-history-list">
+            <p><strong>v43</strong> 최종 억까 지수 공식을 장비+스톤 중심으로 정리하고, 상쇄 단서를 최종 점수에서 차감하도록 수정했습니다. 장신구 공식 연마 확률표를 로컬 데이터로 추가했습니다.</p>
             <p><strong>v42</strong> 스톤 시도 수가 기대값을 크게 초과하면 “가능성 있음”이 아니라 강한/극단적 억까로 판정하도록 수정했습니다. 비정상적으로 큰 입력은 재확인 안내를 함께 표시합니다.</p>
             <p><strong>v41</strong> 장기백 입력에서 횟수와 시점 선택을 제거하고, 기록을 부위+강화구간 단위로 단순화했습니다. 강화 구간은 +11부터 현재 강화 단계까지 표시합니다.</p>
             <p><strong>v40</strong> 에기르 장비와 운명의 전율 장비의 재련표 라벨을 분리하고, 캐릭터 장비 이름 기준으로 재련표 구간을 자동 선택하도록 수정했습니다. 백엔드 준비 전 API 502가 보이는 문제를 줄이기 위해 재시도와 헬스체크를 추가했습니다.</p>

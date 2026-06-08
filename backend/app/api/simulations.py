@@ -66,7 +66,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         selected_modules,
         req.simulationCount,
         req.seed,
-        model_version="v34-class-engraving-preset-auto-material",
+        model_version="v43-ekka-formula-accessory-prob-table",
         price_fingerprint=engine.material_price_fingerprint,
     )
     cache_hit = store.exists(cache_key)

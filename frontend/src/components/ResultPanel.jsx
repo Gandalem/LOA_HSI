@@ -296,21 +296,23 @@ function attemptComparisonAnalysis({ actualAttempts, expectedAttempts, itemName 
     return { score: 0, offsetScore: 0, label: '기대값 없음', detail: '기대값을 계산하지 못해 억까/상쇄 점수에 반영하지 않습니다.', ratio: null, direction: 'none' };
   }
   const ratio = actualAttempts / expectedAttempts;
-  if (ratio < 0.75) {
-    return { score: 0, offsetScore: clamp((1 - ratio) * 34, 8, 28), label: '잘 나온 편', detail: `기대 ${number(expectedAttempts)}${unit}보다 꽤 적은 ${number(actualAttempts, 0)}${unit} 안에 끝난 기억입니다. 억까가 아니라 상쇄 단서로 봅니다.`, ratio, direction: 'good' };
+  const p = 1 / expectedAttempts;
+  const cdf = 1 - Math.pow(1 - p, actualAttempts);
+  const cdfPercent = cdf * 100;
+  const base = { ratio, cdf, cdfPercent };
+  if (cdf < 0.5) {
+    const offsetScore = Math.round(clamp(((0.5 - cdf) / 0.5) * 15, 1, 15));
+    return { ...base, score: 0, offsetScore, label: '잘 나온 편', detail: `같은 목표 기준 ${number(actualAttempts, 0)}${unit} 안에 성공할 누적확률은 약 ${number(cdfPercent, 1)}%입니다. 평균보다 빠른 편이라 억까가 아니라 상쇄 단서로 봅니다.`, direction: 'good' };
   }
-  if (ratio < 1) {
-    return { score: 0, offsetScore: 6, label: '기대보다 약간 적은 시도', detail: `기대 ${number(expectedAttempts)}${unit}보다 적게 끝난 기억입니다. 억까 단서가 아니라 약한 상쇄 단서입니다.`, ratio, direction: 'good' };
-  }
-  if (ratio >= 100) {
-    return { score: 100, offsetScore: 0, label: '극단적 억까', detail: `입력값이 매우 큽니다. 입력한 ${number(actualAttempts, 0)}${unit}가 사실이라면 기대값의 ${number(ratio, 1)}배 수준으로, 일반적인 확률 범위를 크게 벗어난 극단적 억까입니다.`, ratio, direction: 'bad', extreme: true, suspiciousInput: true };
-  }
-  if (ratio >= 10) return { score: 90, offsetScore: 0, label: '극단적 억까', detail: `기대값의 ${number(ratio, 1)}배 이상 시도한 기억입니다. 입력값이 사실이라면 이 항목만으로도 접을 만한 수준의 극단적 억까입니다.`, ratio, direction: 'bad', extreme: true };
-  if (ratio >= 5) return { score: 75, offsetScore: 0, label: '매우 강한 억까', detail: `기대값의 ${number(ratio, 1)}배 정도 시도한 기억입니다. 매우 강한 억까 단서로 봅니다.`, ratio, direction: 'bad' };
-  if (ratio >= 3) return { score: 58, offsetScore: 0, label: '강한 초과 시도', detail: `기대값의 ${number(ratio, 1)}배 이상 시도한 기억입니다. 강한 억까 단서로 봅니다.`, ratio, direction: 'bad' };
-  if (ratio >= 2) return { score: 42, offsetScore: 0, label: '큰 초과 시도', detail: `기대값의 ${number(ratio, 1)}배 정도 시도한 기억입니다. 억까 의심 단서로 봅니다.`, ratio, direction: 'bad' };
-  if (ratio >= 1.4) return { score: 28, offsetScore: 0, label: '초과 시도', detail: `기대값보다 ${number((ratio - 1) * 100, 0)}% 정도 더 시도한 기억입니다. 약한~중간 억까 단서로 봅니다.`, ratio, direction: 'bad' };
-  return { score: 12, offsetScore: 0, label: '평균보다 약간 초과', detail: '기대값보다 조금 더 시도한 기억입니다.', ratio, direction: 'bad' };
+  if (cdf < 0.75) return { ...base, score: 5, offsetScore: 0, label: '평균 근처', detail: `같은 목표 기준 누적확률 약 ${number(cdfPercent, 1)}% 지점입니다. 평균 근처라 약한 단서로만 봅니다.`, direction: 'bad' };
+  if (cdf < 0.90) return { ...base, score: 15, offsetScore: 0, label: '늦은 편', detail: `같은 목표 기준 누적확률 약 ${number(cdfPercent, 1)}% 지점입니다. 보통보다 늦은 편입니다.`, direction: 'bad' };
+  if (cdf < 0.95) return { ...base, score: 25, offsetScore: 0, label: '억까 의심', detail: `같은 목표 기준 누적확률 약 ${number(cdfPercent, 1)}% 지점입니다. 억까 의심 단서로 봅니다.`, direction: 'bad' };
+  if (cdf < 0.99) return { ...base, score: 35, offsetScore: 0, label: '강한 억까', detail: `같은 목표 기준 누적확률 약 ${number(cdfPercent, 1)}% 지점입니다. 강한 억까 단서로 봅니다.`, direction: 'bad' };
+  const suspiciousInput = ratio >= 100;
+  const detail = suspiciousInput
+    ? `입력값이 매우 큽니다. 그래도 입력한 ${number(actualAttempts, 0)}${unit}가 사실이라면 누적확률 약 ${number(cdfPercent, 3)}% 지점의 극단적 억까입니다.`
+    : `같은 목표 기준 누적확률 약 ${number(cdfPercent, 2)}% 지점입니다. 입력값이 사실이라면 이 항목만으로도 접을 만한 수준입니다.`;
+  return { ...base, score: 45, offsetScore: 0, label: '극단적 억까', detail, direction: 'bad', extreme: true, suspiciousInput };
 }
 
 function hasMemoryEvidence(memoryHints, result) {
@@ -347,7 +349,8 @@ function buildMemoryReport(result, memoryHints = {}) {
 
   const rawTotal = equipment + stone;
   const offsetTotal = offsetParts.reduce((sum, part) => sum + part.score, 0);
-  const total = Math.round(clamp(rawTotal, 0, 100));
+  let total = Math.round(clamp(rawTotal - offsetTotal, 0, 100));
+  if (stoneAnalysis.extreme) total = Math.max(total, 80);
   const strongest = [...parts].filter((part) => part.score > 0).sort((a, b) => b.score - a.score)[0] || null;
 
   if (!evidence) {
@@ -510,6 +513,7 @@ function ExpectedValuePanel({ expectedValues }) {
               })}
             </tbody>
           </table>
+          <p className="hint">공식 장신구 연마 확률표는 로컬 데이터로 포함했습니다. 직접 연마 시도 수 입력은 아직 화면에 넣지 않았기 때문에 억까 지수에는 반영하지 않습니다.</p>
         </div>
         <div className="table-wrap mini-table-wrap">
           <h4>팔찌 유효 특수효과</h4>
@@ -532,8 +536,8 @@ function MainInterpretation({ memoryReport, difficulty, biggestModule }) {
   if (memoryReport.strongest) lines.push(`${memoryReport.strongest.name} 쪽에 기억 기반 억까 단서가 있습니다.`);
   else lines.push('기억 입력만으로는 특정 억까 구간을 강하게 지목하지 않습니다.');
   if (memoryReport.offsetParts.length) lines.push(`${memoryReport.offsetParts.map((x) => x.name).join(', ')}은 기대보다 잘 나온 구간으로 입력되어 상쇄 단서로 봅니다.`);
-  if (difficulty.strongest) lines.push(`현재 결과물 재현 난이도에서 가장 부담이 큰 항목은 ${difficulty.strongest.name}입니다.`);
-  if (biggestModule) lines.push(`비용 분포는 현재 선택된 분석 항목 기준이며, 가장 큰 평균 비용 항목은 ${moduleName(biggestModule.module)}입니다.`);
+  if (biggestModule) lines.push(`선택 항목 중 평균 비용이 가장 큰 항목은 ${moduleName(biggestModule.module)}입니다.`);
+  if (biggestModule) lines.push('계산 근거와 비용 분포는 세부 분석에서 확인할 수 있습니다.');
   return (
     <div className="interpretation-box">
       <h3>한눈에 보기</h3>
@@ -584,7 +588,7 @@ export default function ResultPanel({ result, memoryHints }) {
       {classPreset.engravingName && (
         <div className="preset-line-box compact-preset-line">
           적용 프리셋: <strong>{classPreset.className} · {classPreset.engravingName}</strong>
-          <span>{classPreset.role || '-'} · 신뢰도 {presetConfidence(classPreset.confidence)}</span>
+          <span>{classPreset.role || '-'}</span>
         </div>
       )}
 
@@ -629,7 +633,7 @@ export default function ResultPanel({ result, memoryHints }) {
           </div>
           <div className="ekka-module-card orange-line">
             <div className="module-title-row"><strong>장신구 연마</strong><span>{result.modules?.accessory ? '유효 옵션 분리' : '분석 제외'}</span></div>
-            <p>{result.modules?.accessory ? '총 파싱 효과를 핵심 유효 / 보조 유효 / 비핵심으로 나눠 표시합니다.' : '비교 설정에서 장신구/팔찌가 선택되지 않았습니다.'}</p>
+            <p>{result.modules?.accessory ? '총 파싱 효과를 핵심 유효 / 보조 유효 / 비핵심으로 나눠 표시합니다. v43에서는 직접 연마 시도 수를 받지 않으므로 억까 지수에는 넣지 않습니다.' : '비교 설정에서 장신구/팔찌가 선택되지 않았습니다.'}</p>
             <ul>
               <li>프리셋: {classPreset.engravingName ? `${classPreset.className} · ${classPreset.engravingName}` : (acc.role === 'support' ? '서포터' : '딜러')}</li>
               <li>파싱 효과 줄: {acc.currentParsedEffectCount ?? (acc.currentParsedEffects || []).length}개 <span className="muted-small">/ 고유 {acc.currentParsedUniqueEffectCount ?? (acc.currentParsedEffects || []).length}개</span></li>
@@ -644,7 +648,7 @@ export default function ResultPanel({ result, memoryHints }) {
           </div>
           <div className="ekka-module-card blue-line">
             <div className="module-title-row"><strong>팔찌</strong><span>{result.modules?.accessory ? '핵심/보조/조건부 분리' : '분석 제외'}</span></div>
-            <p>{result.modules?.accessory ? '직업/역할 프리셋에 따라 팔찌 효과를 핵심 유효·보조 유효·조건부 옵션으로 나눠 표시합니다.' : '비교 설정에서 장신구/팔찌가 선택되지 않았습니다.'}</p>
+            <p>{result.modules?.accessory ? '직업/역할 프리셋에 따라 팔찌 효과를 핵심 유효·보조 유효·조건부 옵션으로 나눠 표시합니다. v43에서는 획득 방식/시도 수를 받지 않으므로 억까 지수에는 넣지 않습니다.' : '비교 설정에서 장신구/팔찌가 선택되지 않았습니다.'}</p>
             <ul>
               <li>프리셋: {classPreset.engravingName ? `${classPreset.className} · ${classPreset.engravingName}` : (bracelet.role === 'support' ? '서포터' : '딜러')} · 등급 {bracelet.grade || '-'}</li>
               <li>핵심 유효 옵션: <EffectTagList items={bracelet.currentValidEffects || []} /></li>
