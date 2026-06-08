@@ -315,11 +315,191 @@ function attemptComparisonAnalysis({ actualAttempts, expectedAttempts, itemName 
   return { ...base, score: 45, offsetScore: 0, label: '극단적 억까', detail, direction: 'bad', extreme: true, suspiciousInput };
 }
 
+
+function accessoryKey(item, index) {
+  return `${item?.slot || '장신구'}-${index}`;
+}
+
+function accessoryModeLabel(mode) {
+  const map = { unknown: '기억 안 남', purchased: '구매함', polished: '직접 연마함' };
+  return map[mode] || '기억 안 남';
+}
+
+function normalizeAccessorySlot(slot) {
+  const s = String(slot || '');
+  if (s.includes('목걸이')) return 'necklace';
+  if (s.includes('귀걸이')) return 'earring';
+  if (s.includes('반지')) return 'ring';
+  return 'accessory';
+}
+
+function extractNumber(text) {
+  const m = String(text || '').match(/[+＋-]?(\d+(?:\.\d+)?)/);
+  return m ? Number(m[1]) : null;
+}
+
+function presetRole(classPreset) {
+  const role = String(classPreset?.role || '');
+  if (role.includes('서포터')) return 'support';
+  return 'dealer';
+}
+
+function accessoryCoreKeywordsForSlot(classPreset, slot) {
+  const role = presetRole(classPreset);
+  const opts = classPreset?.polishOptions || classPreset?.polish_options || {};
+  const part = normalizeAccessorySlot(slot);
+  if (role === 'support') {
+    return opts.party_damage || ['낙인력', '아군 공격력 강화', '아군 피해량 강화'];
+  }
+  if (part === 'necklace') return opts.necklace || ['추가 피해', '적에게 주는 피해'];
+  if (part === 'earring') return opts.earring || ['공격력', '무기 공격력'];
+  if (part === 'ring') return opts.ring || ['치명타 적중률', '치명타 피해'];
+  return ['추가 피해', '적에게 주는 피해', '공격력', '무기 공격력', '치명타 적중률', '치명타 피해'];
+}
+
+function firstMatchingKeyword(effect, keywords) {
+  return (keywords || []).find((keyword) => keyword && String(effect || '').includes(keyword)) || null;
+}
+
+function gradeLevelFromEffect(effect) {
+  const e = String(effect || '');
+  const v = extractNumber(e);
+  if (v === null) return 1;
+  if (e.includes('추가 피해')) return v >= 1.6 ? 3 : v >= 1.2 ? 2 : 1;
+  if (e.includes('적에게 주는 피해')) return v >= 1.2 ? 3 : v >= 0.75 ? 2 : 1;
+  if (e.includes('치명타 피해')) return v >= 2.4 ? 3 : v >= 1.8 ? 2 : 1;
+  if (e.includes('치명타 적중률')) return v >= 0.95 ? 3 : v >= 0.7 ? 2 : 1;
+  if (e.includes('무기 공격력') && e.includes('%')) return v >= 3.0 ? 3 : v >= 1.8 ? 2 : 1;
+  if (e.includes('공격력') && e.includes('%')) return v >= 0.95 ? 3 : v >= 0.55 ? 2 : 1;
+  if (e.includes('낙인력')) return v >= 8 ? 3 : v >= 5 ? 2 : 1;
+  if (e.includes('아군 피해량 강화')) return v >= 7.5 ? 3 : v >= 5 ? 2 : 1;
+  if (e.includes('아군 공격력 강화')) return v >= 3 ? 3 : v >= 1.5 ? 2 : 1;
+  if (e.includes('보호막') || e.includes('회복')) return v >= 3 ? 3 : v >= 1.5 ? 2 : 1;
+  return 1;
+}
+
+function gradeLabel(level) {
+  if (level >= 3) return '상';
+  if (level >= 2) return '중';
+  return '하';
+}
+
+function singleGradeProbability(level) {
+  if (level >= 3) return 0.007;
+  if (level >= 2) return 0.030;
+  return 0.063;
+}
+
+function accessoryTargetForItem(item, classPreset, comboTargets = {}) {
+  const effects = item?.accessory_effects || item?.accessoryEffects || [];
+  const keywords = accessoryCoreKeywordsForSlot(classPreset, item?.slot);
+  const core = effects
+    .map((effect) => ({ effect, keyword: firstMatchingKeyword(effect, keywords), level: gradeLevelFromEffect(effect) }))
+    .filter((row) => row.keyword);
+  if (!core.length) {
+    return { probability: null, expectedAttempts: null, label: '유효 연마 없음', coreEffects: [], targetName: null };
+  }
+  const sorted = [...core].sort((a, b) => b.level - a.level);
+  let targetName = null;
+  let probability = null;
+  let expectedAttempts = null;
+  if (sorted.length >= 2) {
+    const [a, b] = sorted;
+    if (a.level >= 3 && b.level >= 3) targetName = '상상';
+    else if (a.level >= 3 && b.level >= 2) targetName = '상중 이상';
+    else if (a.level >= 2 && b.level >= 2) targetName = '중중 이상';
+    else targetName = '하하 이상';
+    const target = comboTargets[targetName] || {};
+    probability = Number(target.probability || 0) || null;
+    expectedAttempts = Number(target.expectedAttempts || 0) || (probability ? 1 / probability : null);
+  } else {
+    const level = sorted[0].level;
+    targetName = `단일 ${gradeLabel(level)}급 유효 옵션`;
+    probability = singleGradeProbability(level);
+    expectedAttempts = 1 / probability;
+  }
+  return { probability, expectedAttempts, label: targetName, coreEffects: sorted, targetName };
+}
+
+function buildAccessoryMemoryAnalysis(result, memoryHints = {}, enabled = true) {
+  if (!enabled) {
+    return { score: 0, offsetScore: 0, label: '분석 제외', detail: '장신구/팔찌 항목을 선택하지 않아 장신구 직접 연마 기록을 반영하지 않았습니다.', items: [], offsetItems: [], purchasedCount: 0, unknownCount: 0 };
+  }
+  const character = result?.character || {};
+  const expected = result?.expectedValues || {};
+  const comboTargets = expected?.accessoryPolishing?.combination?.comboTargets || {};
+  const classPreset = expected.classEngravingPreset || character.class_engraving_preset || {};
+  const acquisitions = memoryHints?.accessoryAcquisitions || {};
+  const accessories = (character.accessories || []).filter((item) => item.slot !== '팔찌');
+  const items = [];
+  const offsetItems = [];
+  let score = 0;
+  let offsetScore = 0;
+  let purchasedCount = 0;
+  let unknownCount = 0;
+
+  accessories.forEach((item, index) => {
+    const key = accessoryKey(item, index);
+    const input = acquisitions[key] || { mode: 'unknown', attempts: '' };
+    const mode = input.mode || 'unknown';
+    if (mode === 'purchased') {
+      purchasedCount += 1;
+      return;
+    }
+    if (mode !== 'polished') {
+      unknownCount += 1;
+      return;
+    }
+    const attempts = memoryNumber(input.attempts);
+    const target = accessoryTargetForItem(item, classPreset, comboTargets);
+    const analysis = attemptComparisonAnalysis({ actualAttempts: attempts, expectedAttempts: target.expectedAttempts, itemName: `${item.slot || '장신구'} 직접 연마`, unit: '회', enabled: true });
+    const row = {
+      key,
+      name: `${item.slot || '장신구'} · ${item.name || '이름 없음'}`,
+      score: Math.round(analysis.score),
+      offsetScore: Math.round(analysis.offsetScore),
+      kind: analysis.label,
+      detail: target.expectedAttempts
+        ? `${target.label} 목표 기준 기대 ${number(target.expectedAttempts)}회와 입력 ${attempts === null ? '미입력' : `${number(attempts, 0)}회`}를 비교했습니다. ${analysis.detail}`
+        : '현재 장신구에서 공식 확률표와 비교할 유효 연마 목표를 찾지 못했습니다.',
+      target,
+      attempts,
+      analysis
+    };
+    if (row.score > 0) {
+      items.push(row);
+      score += row.score;
+    }
+    if (row.offsetScore > 0) {
+      offsetItems.push({ ...row, score: row.offsetScore });
+      offsetScore += row.offsetScore;
+    }
+  });
+
+  score = Math.round(clamp(score, 0, 35));
+  offsetScore = Math.round(clamp(offsetScore, 0, 20));
+  let label = '입력 없음';
+  let detail = '직접 연마한 장신구와 시도 수를 입력하면 공식 연마 확률표 기준으로 비교합니다.';
+  if (items.length) {
+    label = score >= 30 ? '강한 장신구 억까 단서' : score >= 15 ? '장신구 억까 단서 있음' : '약한 장신구 단서';
+    detail = '직접 연마로 입력한 장신구의 목표 조합 기대값과 실제 시도 수를 비교했습니다.';
+  } else if (offsetItems.length) {
+    label = '잘 나온 장신구 기록 있음';
+    detail = '직접 연마한 장신구 중 기대보다 적은 시도에 끝난 기록이 있습니다.';
+  } else if (purchasedCount || unknownCount) {
+    label = '점수 미반영';
+    detail = '구매함/기억 안 남으로 선택한 장신구는 억까 점수에 넣지 않았습니다.';
+  }
+  return { score, offsetScore, label, detail, items, offsetItems, purchasedCount, unknownCount };
+}
+
 function hasMemoryEvidence(memoryHints, result) {
   const modules = result?.modules || {};
   const records = validPityRecords(memoryHints);
   const attempts = memoryNumber(memoryHints?.stoneAttempts);
-  return (Boolean(modules.equipment) && records.length > 0) || (Boolean(modules.abilityStone) && attempts !== null && attempts > 0);
+  const accessoryInputs = Object.values(memoryHints?.accessoryAcquisitions || {});
+  const hasAccessoryAttempt = Boolean(modules.accessory) && accessoryInputs.some((item) => item?.mode === 'polished' && memoryNumber(item?.attempts) !== null && memoryNumber(item?.attempts) > 0);
+  return (Boolean(modules.equipment) && records.length > 0) || (Boolean(modules.abilityStone) && attempts !== null && attempts > 0) || hasAccessoryAttempt;
 }
 
 function buildMemoryReport(result, memoryHints = {}) {
@@ -329,6 +509,7 @@ function buildMemoryReport(result, memoryHints = {}) {
   const stoneEnabled = Boolean(modules.abilityStone);
   const stoneExpected = Number(expected.abilityStone?.expectedStones || 0);
   const stoneAttempts = memoryNumber(memoryHints?.stoneAttempts);
+  const accessoryEnabled = Boolean(modules.accessory);
   const evidence = hasMemoryEvidence(memoryHints, result);
 
   const equipmentAnalysis = buildEquipmentMemoryAnalysis(memoryHints, equipmentEnabled, result?.character);
@@ -336,21 +517,28 @@ function buildMemoryReport(result, memoryHints = {}) {
 
   const stoneAnalysis = attemptComparisonAnalysis({ actualAttempts: stoneAttempts, expectedAttempts: stoneExpected, itemName: '스톤 시도', unit: '개', enabled: stoneEnabled });
   const stone = clamp(stoneAnalysis.score, 0, 100);
+  const accessoryAnalysis = buildAccessoryMemoryAnalysis(result, memoryHints, accessoryEnabled);
+  const accessory = clamp(accessoryAnalysis.score, 0, 35);
 
   const parts = [
     { key: 'equipment', name: '장비 재련', score: Math.round(equipment), kind: equipmentAnalysis.label, detail: equipmentAnalysis.detail },
-    { key: 'abilityStone', name: '어빌리티 스톤', score: Math.round(stone), kind: stoneAnalysis.label, detail: stoneAnalysis.detail }
+    { key: 'abilityStone', name: '어빌리티 스톤', score: Math.round(stone), kind: stoneAnalysis.label, detail: stoneAnalysis.detail },
+    { key: 'accessoryPolishing', name: '장신구 연마', score: Math.round(accessory), kind: accessoryAnalysis.label, detail: accessoryAnalysis.detail }
   ];
 
   const offsetParts = [];
   if (stoneAnalysis.offsetScore > 0) {
     offsetParts.push({ key: 'abilityStone', name: '어빌리티 스톤', score: Math.round(stoneAnalysis.offsetScore), kind: stoneAnalysis.label, detail: stoneAnalysis.detail });
   }
+  for (const item of accessoryAnalysis.offsetItems || []) {
+    offsetParts.push({ key: item.key, name: '장신구 연마', score: Math.round(item.score), kind: item.kind, detail: item.detail });
+  }
 
-  const rawTotal = equipment + stone;
+  const rawTotal = equipment + stone + accessory;
   const offsetTotal = offsetParts.reduce((sum, part) => sum + part.score, 0);
   let total = Math.round(clamp(rawTotal - offsetTotal, 0, 100));
-  if (stoneAnalysis.extreme) total = Math.max(total, 80);
+  const accessoryExtreme = (accessoryAnalysis.items || []).some((item) => item.analysis?.extreme);
+  if (stoneAnalysis.extreme || accessoryExtreme) total = Math.max(total, 80);
   const strongest = [...parts].filter((part) => part.score > 0).sort((a, b) => b.score - a.score)[0] || null;
 
   if (!evidence) {
@@ -366,19 +554,22 @@ function buildMemoryReport(result, memoryHints = {}) {
       offsetParts,
       evidence,
       stoneAnalysis,
-      equipmentAnalysis
+      equipmentAnalysis,
+      accessoryAnalysis
     };
   }
 
   let verdict = '억까 단서 약함';
   let tone = 'stable';
   let oneLine = '입력한 기억만 보면 접을 만큼의 억까라고 단정하기는 어렵습니다.';
-  if (stoneAnalysis.extreme || total >= 90) {
+  if (stoneAnalysis.extreme || accessoryExtreme || total >= 90) {
     verdict = '극단적 억까';
     tone = 'danger';
     oneLine = stoneAnalysis.extreme
       ? '어빌리티 스톤에서 극단적 초과 시도 단서가 감지되었습니다. 입력값이 사실이라면 이 구간만으로도 접을 만한 수준입니다.'
-      : '입력한 기억 기준으로 극단적인 억까 단서가 있습니다.';
+      : accessoryExtreme
+        ? '장신구 직접 연마에서 극단적 초과 시도 단서가 감지되었습니다. 입력값이 사실이라면 강한 억까로 볼 수 있습니다.'
+        : '입력한 기억 기준으로 극단적인 억까 단서가 있습니다.';
   } else if (total >= 70) {
     verdict = '접을 만했음';
     tone = 'danger';
@@ -397,7 +588,7 @@ function buildMemoryReport(result, memoryHints = {}) {
     oneLine += ' 다만 기대보다 잘 나온 구간이 있어 일부 체감은 상쇄될 수 있습니다.';
   }
 
-  return { total, offsetTotal, scoreLabel: `${total}/100`, verdict, tone, oneLine, strongest, parts, offsetParts, evidence, stoneAnalysis, equipmentAnalysis };
+  return { total, offsetTotal, scoreLabel: `${total}/100`, verdict, tone, oneLine, strongest, parts, offsetParts, evidence, stoneAnalysis, equipmentAnalysis, accessoryAnalysis };
 }
 
 function detectedAreaNamesFromReport(memoryReport) {
@@ -425,6 +616,7 @@ function MemoryInterpretation({ memoryHints, memoryReport }) {
       <div className="memory-list">
         <PityRecordSummary records={records} disconnectedRecords={memoryReport.equipmentAnalysis.disconnectedRecords || []} />
         <span>스톤 시도 개수: <strong>{stoneAttempts === null ? '입력 안 함' : `${stoneAttempts.toLocaleString('ko-KR')}개`}</strong></span>
+        <span>장신구 직접 연마 기록: <strong>{memoryReport.accessoryAnalysis?.items?.length || memoryReport.accessoryAnalysis?.offsetItems?.length ? `${(memoryReport.accessoryAnalysis.items?.length || 0) + (memoryReport.accessoryAnalysis.offsetItems?.length || 0)}건` : '없음'}</strong></span>
         <span>숫자 입력으로 감지된 의심 구간: <strong>{detectedAreaNamesFromReport(memoryReport)}</strong></span>
       </div>
       <p className="hint">장기백은 부위와 강화 구간을 기준으로 봅니다. 현재 캐릭터와 직접 연결되지 않는 구간은 참고 기록으로만 표시합니다.</p>
@@ -513,7 +705,7 @@ function ExpectedValuePanel({ expectedValues }) {
               })}
             </tbody>
           </table>
-          <p className="hint">공식 장신구 연마 확률표는 로컬 데이터로 포함했습니다. 직접 연마 시도 수 입력은 아직 화면에 넣지 않았기 때문에 억까 지수에는 반영하지 않습니다.</p>
+          <p className="hint">공식 장신구 연마 확률표를 로컬 데이터로 포함했습니다. 직접 연마로 입력한 장신구만 시도 수를 기대값과 비교해 억까 지수에 반영합니다.</p>
         </div>
         <div className="table-wrap mini-table-wrap">
           <h4>팔찌 유효 특수효과</h4>
@@ -633,7 +825,7 @@ export default function ResultPanel({ result, memoryHints }) {
           </div>
           <div className="ekka-module-card orange-line">
             <div className="module-title-row"><strong>장신구 연마</strong><span>{result.modules?.accessory ? '유효 옵션 분리' : '분석 제외'}</span></div>
-            <p>{result.modules?.accessory ? '총 파싱 효과를 핵심 유효 / 보조 유효 / 비핵심으로 나눠 표시합니다. v43에서는 직접 연마 시도 수를 받지 않으므로 억까 지수에는 넣지 않습니다.' : '비교 설정에서 장신구/팔찌가 선택되지 않았습니다.'}</p>
+            <p>{result.modules?.accessory ? '총 파싱 효과를 핵심 유효 / 보조 유효 / 비핵심으로 나눠 표시합니다. 직접 연마로 입력한 장신구는 공식 연마 확률표 기준으로 억까 지수에 반영합니다.' : '비교 설정에서 장신구/팔찌가 선택되지 않았습니다.'}</p>
             <ul>
               <li>프리셋: {classPreset.engravingName ? `${classPreset.className} · ${classPreset.engravingName}` : (acc.role === 'support' ? '서포터' : '딜러')}</li>
               <li>파싱 효과 줄: {acc.currentParsedEffectCount ?? (acc.currentParsedEffects || []).length}개 <span className="muted-small">/ 고유 {acc.currentParsedUniqueEffectCount ?? (acc.currentParsedEffects || []).length}개</span></li>
@@ -644,6 +836,8 @@ export default function ResultPanel({ result, memoryHints }) {
               <li>비핵심 효과: {acc.currentNonCoreCount ?? (acc.currentNonCoreEffects || []).length}개</li>
               <li>핵심 옵션: <EffectTagList items={(acc.currentCoreEffects || acc.currentValidLikeEffects || []).slice(0, 12)} /></li>
               <li>보조 옵션: <EffectTagList items={(acc.currentSecondaryEffects || []).slice(0, 12)} /></li>
+              <li>직접 연마 판정: {memoryReport.accessoryAnalysis?.items?.length ? <EffectTagList items={memoryReport.accessoryAnalysis.items.map((item) => `${item.name}: ${item.kind}`)} /> : '억까 기록 없음'}</li>
+              <li>잘 나온 장신구: {memoryReport.accessoryAnalysis?.offsetItems?.length ? <EffectTagList items={memoryReport.accessoryAnalysis.offsetItems.map((item) => `${item.name}: ${item.kind}`)} /> : '없음'}</li>
             </ul>
           </div>
           <div className="ekka-module-card blue-line">

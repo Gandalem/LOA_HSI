@@ -23,7 +23,8 @@ function App() {
   const [priceAutoLoaded, setPriceAutoLoaded] = useState(false);
   const [memoryHints, setMemoryHints] = useState({
     pityRecords: [{ part: 'unknown', target: 'unknown' }],
-    stoneAttempts: ''
+    stoneAttempts: '',
+    accessoryAcquisitions: {}
   });
 
   useEffect(() => {
@@ -44,7 +45,14 @@ function App() {
         }
         return record;
       });
-      return changed ? { ...prev, pityRecords: next } : prev;
+      const currentAcq = prev.accessoryAcquisitions || {};
+      const nextAcq = {};
+      accessoryRows(character).forEach((row) => {
+        nextAcq[row.key] = currentAcq[row.key] || { mode: 'unknown', attempts: '' };
+      });
+      const acqChanged = JSON.stringify(currentAcq) !== JSON.stringify(nextAcq);
+      if (changed || acqChanged) return { ...prev, pityRecords: next, accessoryAcquisitions: nextAcq };
+      return prev;
     });
   }, [character]);
 
@@ -258,11 +266,27 @@ function App() {
     });
   }
 
+  function accessoryRows(sourceCharacter = character) {
+    const accessories = sourceCharacter?.accessories || [];
+    return accessories
+      .map((item, index) => ({ ...item, index, key: `${item.slot || '장신구'}-${index}` }))
+      .filter((item) => item.slot !== '팔찌');
+  }
+
+  function updateAccessoryAcquisition(key, field, value) {
+    setMemoryHints((prev) => {
+      const current = prev.accessoryAcquisitions || {};
+      const before = current[key] || { mode: 'unknown', attempts: '' };
+      const nextValue = field === 'mode' && value !== 'polished' ? { ...before, [field]: value, attempts: '' } : { ...before, [field]: value };
+      return { ...prev, accessoryAcquisitions: { ...current, [key]: nextValue } };
+    });
+  }
+
   return (
     <main className="container">
       <header className="hero ekka-hero">
         <div>
-          <p className="eyebrow">LOA-HSI v43</p>
+          <p className="eyebrow">LOA-HSI v44</p>
           <h1>내가 접을 만했나? 로스트아크 성장 억까 리포트</h1>
           <p className="hero-copy">핵심 결론만 먼저 보여주고, 자세한 계산은 필요할 때 펼쳐보는 리포트입니다.</p>
         </div>
@@ -365,6 +389,38 @@ function App() {
             <label>시뮬레이션 수<span><select value={simulationCount} onChange={(e) => setSimulationCount(e.target.value)}><option value="10000">1만 명</option><option value="100000">10만 명</option><option value="300000">30만 명</option></select></span></label>
             <label>100골드 원화 환산<span><input type="number" step="1" value={krwPer100Gold} onChange={(e) => setKrwPer100Gold(e.target.value)} /> 원</span></label>
           </div>
+
+          <div className={`accessory-acquisition-panel ${modules.accessory ? '' : 'disabled-panel'}`}>
+            <div>
+              <h3>장신구 획득 방식</h3>
+              <p className="hint">구매한 장신구는 운 점수에 넣지 않습니다. 직접 연마한 장신구만 시도 수를 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>
+            </div>
+            <div className="accessory-acquisition-list">
+              {accessoryRows().map((item) => {
+                const current = memoryHints.accessoryAcquisitions?.[item.key] || { mode: 'unknown', attempts: '' };
+                return (
+                  <div className="accessory-acquisition-row" key={item.key}>
+                    <div className="accessory-acquisition-name">
+                      <strong>{item.slot}</strong>
+                      <small>{item.name || '장신구'} · 품질 {item.quality ?? '-'}</small>
+                    </div>
+                    <select disabled={!modules.accessory} value={current.mode || 'unknown'} onChange={(e) => updateAccessoryAcquisition(item.key, 'mode', e.target.value)}>
+                      <option value="unknown">기억 안 남</option>
+                      <option value="purchased">구매함</option>
+                      <option value="polished">직접 연마함</option>
+                    </select>
+                    {current.mode === 'polished' && (
+                      <label className="inline-attempt-input">
+                        <input type="number" min="0" step="1" disabled={!modules.accessory} value={current.attempts || ''} onChange={(e) => updateAccessoryAcquisition(item.key, 'attempts', e.target.value)} placeholder="시도 수" />
+                        <span>회</span>
+                      </label>
+                    )}
+                  </div>
+                );
+              })}
+              {!accessoryRows().length && <p className="hint">조회된 장신구가 없습니다.</p>}
+            </div>
+          </div>
         </div>
 
         <button className="primary" onClick={runReport} disabled={loading}>{loading ? '분석 중...' : '억까 리포트 생성'}</button>
@@ -376,6 +432,7 @@ function App() {
         <details className="notice-panel footer-notice-panel">
           <summary>공지사항 / 업데이트 내역</summary>
           <div className="notice-list version-history-list">
+            <p><strong>v44</strong> 장신구별 획득 방식을 추가했습니다. 직접 연마한 장신구는 시도 수를 입력하면 공식 연마 확률표 기반 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>
             <p><strong>v43</strong> 최종 억까 지수 공식을 장비+스톤 중심으로 정리하고, 상쇄 단서를 최종 점수에서 차감하도록 수정했습니다. 장신구 공식 연마 확률표를 로컬 데이터로 추가했습니다.</p>
             <p><strong>v42</strong> 스톤 시도 수가 기대값을 크게 초과하면 “가능성 있음”이 아니라 강한/극단적 억까로 판정하도록 수정했습니다. 비정상적으로 큰 입력은 재확인 안내를 함께 표시합니다.</p>
             <p><strong>v41</strong> 장기백 입력에서 횟수와 시점 선택을 제거하고, 기록을 부위+강화구간 단위로 단순화했습니다. 강화 구간은 +11부터 현재 강화 단계까지 표시합니다.</p>

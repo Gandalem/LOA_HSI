@@ -895,3 +895,45 @@ pre { white-space: pre-wrap; color: #bed6fa; }
   .v38-summary-grid { grid-template-columns: 1fr; }
   .memory-record-span small { text-align: left; }
 }
+
+/* v44: accessory acquisition inputs */
+.accessory-acquisition-panel {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,0.11);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.035);
+}
+.accessory-acquisition-panel h3 { margin: 0 0 6px; }
+.accessory-acquisition-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.accessory-acquisition-row {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.5fr) minmax(130px, 0.8fr) minmax(130px, 0.8fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  background: rgba(8,13,22,0.28);
+}
+.accessory-acquisition-name {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: #dcecff;
+}
+.accessory-acquisition-name small { color: #9fb1c7; }
+.inline-attempt-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.inline-attempt-input input { min-width: 0; width: 100%; }
+.inline-attempt-input span { color: #9fb1c7; }
+@media (max-width: 960px) {
+  .accessory-acquisition-row { grid-template-columns: 1fr; }
+}
