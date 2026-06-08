@@ -1,0 +1,29 @@
+{
+  "PageNo": 1,
+  "PageSize": 10,
+  "TotalCount": 2,
+  "Items": [
+    {
+      "CurrentMinPrice": 119,
+      "Id": 6861012,
+      "Name": "아비도스 융화 재료",
+      "Grade": "희귀",
+      "Icon": "https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_12_86.png",
+      "BundleCount": 1,
+      "TradeRemainCount": null,
+      "YDayAvgPrice": 121.5,
+      "RecentPrice": 119
+    },
+    {
+      "CurrentMinPrice": 155,
+      "Id": 6861013,
+      "Name": "상급 아비도스 융화 재료",
+      "Grade": "영웅",
+      "Icon": "https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_13_252.png",
+      "BundleCount": 1,
+      "TradeRemainCount": null,
+      "YDayAvgPrice": 157.5,
+      "RecentPrice": 155
+    }
+  ]
+}

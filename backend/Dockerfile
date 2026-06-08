@@ -7,13 +7,14 @@ ENV PYTHONUNBUFFERED=1
 
 COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt \
-    && addgroup --system --gid 10001 app \
-    && adduser --system --uid 10001 --ingroup app app \
+    && groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app --home-dir /app/backend --shell /usr/sbin/nologin app \
     && mkdir -p /app/data /app/backend
 
 COPY --chown=app:app app ./app
 COPY --chown=app:app config ./config
-RUN chown -R app:app /app/backend /app/data
+RUN chown -R app:app /app/backend /app/data \
+    && chmod -R a-w /app/backend/app /app/backend/config
 
 USER app
 EXPOSE 8000

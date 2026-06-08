@@ -371,13 +371,18 @@ def _extract_bracelet_effects(tooltip_obj: dict[str, Any], tooltip_text: str) ->
 
 
 def _num_from_level(value: Any) -> float | None:
+    """Extract a numeric item level from API strings such as "1,755.00".
+
+    SIMPLE_NUMBER_PATTERN intentionally has no capture group, so use group(0).
+    This keeps the parser safe even when the API returns a plain number string.
+    """
     if value is None:
         return None
     text = str(value).replace(",", "")
     m = SIMPLE_NUMBER_PATTERN.search(text[:MAX_LINE_TEXT])
     if not m:
         return None
-    return float(m.group(1))
+    return float(m.group(0))
 
 
 def _pick(data: dict[str, Any], *keys: str) -> Any:

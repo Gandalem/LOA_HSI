@@ -1,0 +1,18 @@
+{
+  "PageNo": 1,
+  "PageSize": 10,
+  "TotalCount": 1,
+  "Items": [
+    {
+      "CurrentMinPrice": 46,
+      "Id": 66102107,
+      "Name": "운명의 수호석 결정",
+      "Grade": "일반",
+      "Icon": "https://cdn-lostark.game.onstove.com/efui_iconatlas/use/use_13_250.png",
+      "BundleCount": 100,
+      "TradeRemainCount": null,
+      "YDayAvgPrice": 48.1,
+      "RecentPrice": 47
+    }
+  ]
+}
