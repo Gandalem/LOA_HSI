@@ -663,6 +663,15 @@ function DifficultyCards({ difficulty }) {
   );
 }
 
+function StatLine({ label, value, highlight = false }) {
+  return (
+    <div className={`evidence-line ${highlight ? 'highlight' : ''}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
 function ExpectedValuePanel({ expectedValues }) {
   if (!expectedValues) return null;
   const stone = expectedValues.abilityStone || {};
@@ -672,52 +681,54 @@ function ExpectedValuePanel({ expectedValues }) {
   const comboTargets = combo.comboTargets || {};
   const keyCombos = ['상상', '상중 이상', '중중 이상', '하하 이상'];
   const braceletAttempts = bracelet.attemptsForAtLeastOnce || {};
+
   return (
-    <div className="expected-panel">
+    <div className="expected-panel evidence-panel">
       <h3>계산 근거</h3>
-      <div className="expectation-subgrid">
-        <div className="table-wrap mini-table-wrap">
-          <h4>어빌리티 스톤</h4>
-          <table>
-            <tbody>
-              <tr><th>현재 활성 레벨</th><td>{stone.target || '-'} 활성</td></tr>
-              <tr><th>성공 횟수 기준</th><td>{stone.successCountTarget || '-'} 이상</td></tr>
-              <tr><th>한 돌 성공확률</th><td>{probPercent(stone.successProbabilityPerStone)}</td></tr>
-              <tr><th>기대 스톤 개수</th><td>{number(stone.expectedStones)}개</td></tr>
-              <tr><th>9/7 검증값</th><td>{number(stone.reference97ExpectedStones)}개 · {stone.verified ? '정상 범위' : '확인 필요'}</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div className="table-wrap mini-table-wrap">
-          <h4>장신구 조합 기대값</h4>
-          <table>
-            <thead><tr><th>목표 조합</th><th>1회 확률</th><th>기대 횟수</th></tr></thead>
-            <tbody>
-              {keyCombos.map((name) => {
-                const row = comboTargets[name] || {};
-                return (
-                  <tr key={name}>
-                    <td>{name}</td>
-                    <td>{probPercent(row.probability)}</td>
-                    <td>{number(row.expectedAttempts)}회</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <p className="hint">공식 장신구 연마 확률표를 로컬 데이터로 포함했습니다. 직접 연마로 입력한 장신구만 시도 수를 기대값과 비교해 억까 지수에 반영합니다.</p>
-        </div>
-        <div className="table-wrap mini-table-wrap">
-          <h4>팔찌 유효 특수효과</h4>
-          <table>
-            <tbody>
-              <tr><th>역할 프리셋</th><td>{bracelet.role === 'support' ? '서포터' : '딜러'}</td></tr>
-              <tr><th>1회 확률</th><td>{probPercent(bracelet.targetProbabilityOneOrMoreValidSpecial)}</td></tr>
-              <tr><th>기대 시도 수</th><td>{number(bracelet.expectedAttemptsForValidSpecial)}회</td></tr>
-              <tr><th>90% 도달</th><td>{number(braceletAttempts['90%'])}회</td></tr>
-            </tbody>
-          </table>
-        </div>
+      <p className="hint evidence-intro">가로로 넘겨야 하는 표 대신 핵심 계산값만 카드로 정리했습니다. 자세한 원자료는 필요한 값만 확인하면 됩니다.</p>
+
+      <div className="evidence-card-grid">
+        <section className="evidence-card">
+          <div className="evidence-card-head">
+            <strong>어빌리티 스톤</strong>
+            <span>활성 레벨 기준</span>
+          </div>
+          <StatLine label="현재 목표" value={`${stone.target || '-'} 활성`} highlight />
+          <StatLine label="성공 횟수 기준" value={`${stone.successCountTarget || '-'} 이상`} />
+          <StatLine label="한 돌 성공확률" value={probPercent(stone.successProbabilityPerStone)} />
+          <StatLine label="기대 스톤 개수" value={`${number(stone.expectedStones)}개`} highlight />
+          <StatLine label="9/7 검증값" value={`${number(stone.reference97ExpectedStones)}개 · ${stone.verified ? '정상 범위' : '확인 필요'}`} />
+        </section>
+
+        <section className="evidence-card wide-evidence-card">
+          <div className="evidence-card-head">
+            <strong>장신구 조합 기대값</strong>
+            <span>공식 연마 확률표 기반</span>
+          </div>
+          <div className="combo-chip-grid">
+            {keyCombos.map((name) => {
+              const row = comboTargets[name] || {};
+              return (
+                <div className="combo-chip" key={name}>
+                  <span>{name}</span>
+                  <strong>{probPercent(row.probability)}</strong>
+                  <small>기대 {number(row.expectedAttempts)}회</small>
+                </div>
+              );
+            })}
+          </div>
+          <p className="hint compact-hint">직접 연마로 입력한 장신구만 기대값과 실제 시도 수를 비교해 억까 지수에 반영합니다.</p>
+        </section>
+
+        <section className="evidence-card">
+          <div className="evidence-card-head">
+            <strong>팔찌 유효 특수효과</strong>
+            <span>{bracelet.role === 'support' ? '서포터' : '딜러'} 프리셋</span>
+          </div>
+          <StatLine label="1회 확률" value={probPercent(bracelet.targetProbabilityOneOrMoreValidSpecial)} highlight />
+          <StatLine label="기대 시도 수" value={`${number(bracelet.expectedAttemptsForValidSpecial)}회`} />
+          <StatLine label="90% 도달" value={`${number(braceletAttempts['90%'])}회`} />
+        </section>
       </div>
     </div>
   );
