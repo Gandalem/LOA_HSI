@@ -10,10 +10,11 @@ from app.services.simulation_engine import SimulationEngine
 from app.services.simulation_store import SimulationStore, make_cache_key
 from app.services.expectation_calculator import build_expected_value_summary
 from app.services.accessory_probability import build_official_accessory_effect_summary
+from app.services.dataset_writer import DatasetWriter
 from app.services.class_preset import resolve_class_engraving_preset
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
-MODEL_VERSION = "v50-official-accessory-effect-matching"
+MODEL_VERSION = "v51-local-dataset-snapshots"
 
 
 def _points_from_stone_type(value: str | None):
@@ -80,6 +81,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         "장비 재련은 로컬 T4 재련표와 DB 재료 시세를 기준으로 기본 재료/기본 성공확률만 계산합니다.",
         "어빌리티 스톤은 API로 가져온 현재 활성 레벨 결과를 목표로 보고, 사용자가 기억한 시도 개수와 비교합니다.",
         "장신구 효과는 공식 확률표와 매칭한 뒤 중복 제외 보정 기반 기대 시도 수를 계산합니다.",
+        "v51부터 리포트 생성 시 캐릭터/장비/장신구/팔찌/스톤/기억 입력을 로컬 Parquet 데이터셋으로 저장합니다.",
         "팔찌 공식 옵션 매칭과 장신구 실제 거래가 기반 평가는 아직 별도 기능으로 분리 예정입니다.",
         "실제 사용 골드를 입력받지 않는 기본 모드에서는 유저 비용 percentile 판정보다 재현 비용 분포와 기억 기반 단서를 우선합니다.",
         f"재료 가격 fingerprint: {engine.material_price_fingerprint[:12]}... · DB 시세 {len(engine.material_price_rows)}개 반영",
@@ -144,6 +146,22 @@ def compare_character(req: CompareRequest) -> CompareResponse:
             "팔찌 랜덤 옵션 시도 수",
         ],
     }
+
+    try:
+        dataset_result = DatasetWriter().write_report_snapshot(
+            character,
+            expected_values,
+            req.memoryHints,
+            MODEL_VERSION,
+        )
+        artifact_paths["datasetSnapshotId"] = dataset_result["snapshotId"]
+        artifact_paths["datasetDate"] = dataset_result["date"]
+        artifact_paths["datasetTables"] = ",".join(dataset_result["writtenTables"].keys())
+        expected_values["datasetSnapshot"] = dataset_result
+    except Exception as exc:
+        # 데이터셋 저장 실패가 리포트 생성 자체를 막지는 않게 둡니다.
+        artifact_paths["datasetError"] = str(exc)
+        expected_values["datasetSnapshot"] = {"error": str(exc)}
 
     return CompareResponse(
         character=character,
