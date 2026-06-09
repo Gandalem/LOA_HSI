@@ -18,9 +18,10 @@ USER root
 RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/default.conf
 COPY --chown=101:101 --from=build /app/frontend/dist/ /usr/share/nginx/html/
 COPY --chown=101:101 nginx.conf /etc/nginx/conf.d/default.conf
+# Do not run nginx -t at image build time: the Compose DNS name "backend"
+# exists only when containers run on the compose network, not during docker build.
 RUN test -f /usr/share/nginx/html/index.html \
     && grep -q "id=\"root\"" /usr/share/nginx/html/index.html \
-    && nginx -t \
     && ls -la /usr/share/nginx/html \
     && chmod -R a-w /usr/share/nginx/html /etc/nginx/conf.d/default.conf
 USER 101
