@@ -128,6 +128,64 @@ class DatasetWriter:
             "tables": table_status,
         }
 
+    def stats(self) -> dict[str, Any]:
+        """Return compact dataset statistics for the v52 dashboard card."""
+        status = self.status()
+        summary = {
+            "totalSizeBytes": status["totalSizeBytes"],
+            "tables": status["tables"],
+            "characterSnapshotCount": status["tables"].get("character_snapshots", {}).get("rows", 0),
+            "equipmentItemCount": status["tables"].get("equipment_items", {}).get("rows", 0),
+            "accessoryEffectCount": status["tables"].get("accessory_effects", {}).get("rows", 0),
+            "braceletEffectCount": status["tables"].get("bracelet_effects", {}).get("rows", 0),
+            "abilityStoneCount": status["tables"].get("ability_stones", {}).get("rows", 0),
+            "memoryInputCount": status["tables"].get("memory_inputs", {}).get("rows", 0),
+        }
+        return {
+            **summary,
+            "recentSnapshots": self._query_rows(
+                """
+                SELECT snapshot_id, captured_at, character_name, server_name, class_name,
+                       item_avg_level, preset_role, official_accessory_matched_effects,
+                       official_accessory_unmatched_effects
+                FROM v_character_snapshots
+                ORDER BY captured_at DESC
+                LIMIT 8
+                """,
+                required_view="v_character_snapshots",
+            ),
+            "classCounts": self._query_rows(
+                """
+                SELECT COALESCE(class_name, '알 수 없음') AS class_name, COUNT(*) AS snapshots
+                FROM v_character_snapshots
+                GROUP BY 1
+                ORDER BY snapshots DESC, class_name ASC
+                LIMIT 12
+                """,
+                required_view="v_character_snapshots",
+            ),
+            "stoneTypeCounts": self._query_rows(
+                """
+                SELECT COALESCE(stone_type, '알 수 없음') AS stone_type, COUNT(*) AS stones
+                FROM v_ability_stones
+                GROUP BY 1
+                ORDER BY stones DESC, stone_type ASC
+                LIMIT 12
+                """,
+                required_view="v_ability_stones",
+            ),
+            "accessoryMatching": self._query_one(
+                """
+                SELECT
+                    SUM(CASE WHEN matched THEN 1 ELSE 0 END) AS matched_effects,
+                    SUM(CASE WHEN matched THEN 0 ELSE 1 END) AS unmatched_effects,
+                    COUNT(*) AS total_effects
+                FROM v_accessory_effects
+                """,
+                required_view="v_accessory_effects",
+            ),
+        }
+
     def ensure_views(self) -> dict[str, str]:
         created: dict[str, str] = {}
         with duckdb.connect(str(self.db_path)) as con:
@@ -143,6 +201,26 @@ class DatasetWriter:
                 )
                 created[table] = view_name
         return created
+
+    def _query_rows(self, query: str, required_view: str) -> list[dict[str, Any]]:
+        try:
+            with duckdb.connect(str(self.db_path)) as con:
+                if not self._view_exists(con, required_view):
+                    return []
+                return con.execute(query).fetchdf().to_dict("records")
+        except Exception:
+            return []
+
+    def _query_one(self, query: str, required_view: str) -> dict[str, Any]:
+        rows = self._query_rows(query, required_view)
+        return rows[0] if rows else {}
+
+    def _view_exists(self, con: duckdb.DuckDBPyConnection, view_name: str) -> bool:
+        result = con.execute(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
+            [view_name],
+        ).fetchone()
+        return bool(result and result[0])
 
     def _snapshot_id(self, character: CharacterSummary, captured_at: datetime) -> str:
         base = f"{character.server_name}:{character.character_name}:{captured_at.isoformat()}:{uuid.uuid4().hex}"
