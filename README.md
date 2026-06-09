@@ -23,10 +23,18 @@
 
 v49부터 아래 공식 확률표를 로컬 JSON 데이터로 분리하기 시작했습니다.
 
-- `backend/config/accessory_effect_probabilities_official.json`
-- `backend/config/bracelet_t4_probabilities_official.json`
+- `backend/config/accessory_polishing_probabilities_official.json`: 기존 계산기 호환용 장신구 공식 확률표 파일입니다.
+- `backend/config/accessory_effect_probabilities_official.json`: v49 이후 장신구 효과 계산 구조 전환을 위한 새 데이터 뼈대입니다.
+- `backend/config/bracelet_t4_probabilities_official.json`: 팔찌 T4 효과 수/카테고리/중복 제외 규칙 데이터 뼈대입니다.
 
 이 파일들은 공식 확률표 기반 계산으로 넘어가기 위한 기초 데이터입니다. v49에서는 구조와 출처를 먼저 정리하고, 옵션 텍스트와 공식 옵션명 매칭은 후속 버전에서 반영합니다.
+
+## v50 예정
+
+- 현재 장신구 옵션을 공식 확률표 JSON과 직접 매칭합니다.
+- 장신구 중복 제외 보정 확률을 실제 계산에 연결합니다.
+- 팔찌 옵션 텍스트를 공식 T4 옵션명/카테고리/등급 구간과 매칭합니다.
+- 최종 억까 판정 로직 백엔드 이관 여부를 결정합니다.
 
 ## 실행
 
