@@ -1,0 +1,39 @@
+{
+  "metadata": {
+    "version": "v49-official-probability-foundation",
+    "sourceName": "Lost Ark official probability page - 팔찌 T4",
+    "sourceUrl": "https://m-lostark.game.onstove.com/Probability/%ED%8C%94%EC%B0%8C%20T4",
+    "notes": [
+      "공식 페이지의 팔찌 T4 확률표를 계산 데이터로 분리하기 위한 v49 뼈대입니다.",
+      "효과 개수, 카테고리 확률, 중복 제외 보정 규칙을 우선 저장합니다.",
+      "v49에서는 현재 팔찌 옵션 텍스트와 공식 옵션명의 완전 매칭은 다음 버전 작업으로 분리합니다."
+    ]
+  },
+  "leapPoints": {
+    "relic": { "label": "유물", "points": 9 },
+    "ancient": { "label": "고대", "points": 18 }
+  },
+  "effectCounts": {
+    "relic": {
+      "fixed": { "1": 0.65, "2": 0.35 },
+      "assigned": { "1": 0.75, "2": 0.25 }
+    },
+    "ancient": {
+      "fixed": { "1": 0.65, "2": 0.35 },
+      "assigned": { "2": 0.75, "3": 0.25 }
+    }
+  },
+  "categoryProbabilities": {
+    "basic": { "label": "기본 효과", "probability": 0.35, "maxCount": 2 },
+    "combatStat": { "label": "전투 특성", "probability": 0.35, "maxCount": 2 },
+    "special": { "label": "특수 효과", "probability": 0.30, "maxCount": 5 }
+  },
+  "duplicateRule": {
+    "description": "이미 부여된 효과는 중복 부여되지 않으며, 제외된 효과의 표기확률 합을 분모에서 빼 실제 확률을 계산합니다.",
+    "formula": "actualProbability = displayProbability / (1 - excludedDisplayProbabilitySum)"
+  },
+  "matchingPlan": {
+    "v49": "공식 확률표 구조 보관 및 리포트 문구 정리",
+    "v50plus": "현재 팔찌 옵션 텍스트를 공식 옵션명/카테고리/등급 구간과 매칭해 기대 시도 수 계산"
+  }
+}
