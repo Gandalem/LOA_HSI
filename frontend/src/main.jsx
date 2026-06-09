@@ -176,6 +176,7 @@ function App() {
           abilityStone: 0,
           accessory: 0
         },
+        memoryHints,
         simulationCount: Number(simulationCount),
         krwPer100Gold: Number(krwPer100Gold),
         seed: 42,
@@ -307,7 +308,7 @@ function App() {
     <main className="container">
       <header className="hero ekka-hero">
         <div>
-          <p className="eyebrow">LOA-HSI v48</p>
+          <p className="eyebrow">LOA-HSI v51</p>
           <h1>내가 접을 만했나? 로스트아크 성장 억까 리포트</h1>
           <p className="hero-copy">핵심 결론만 먼저 보여주고, 자세한 계산은 필요할 때 펼쳐보는 리포트입니다.</p>
         </div>
@@ -364,7 +365,7 @@ function App() {
           <label className={`module-toggle ${modules.accessory ? 'checked' : ''}`}>
             <input type="checkbox" checked={modules.accessory} onChange={() => toggleModule('accessory')} />
             <span className="module-toggle-icon">✦</span>
-            <span><strong>장신구 / 팔찌</strong><small>연마·유효옵션 희귀도</small></span>
+            <span><strong>장신구 / 팔찌</strong><small>효과·유효옵션 희귀도</small></span>
           </label>
         </div>
 
@@ -414,7 +415,7 @@ function App() {
           <div className={`accessory-acquisition-panel ${modules.accessory ? '' : 'disabled-panel'}`}>
             <div>
               <h3>장신구 획득 방식</h3>
-              <p className="hint">구매한 장신구는 운 점수에 넣지 않습니다. 직접 연마한 장신구만 시도 수를 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>
+              <p className="hint">구매한 장신구는 운 점수에 넣지 않습니다. 직접 옵션을 시도한 장신구만 시도 수를 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>
             </div>
             <div className="accessory-acquisition-list">
               {accessoryRows().map((item) => {
@@ -428,7 +429,7 @@ function App() {
                     <select disabled={!modules.accessory} value={current.mode || 'unknown'} onChange={(e) => updateAccessoryAcquisition(item.key, 'mode', e.target.value)}>
                       <option value="unknown">기억 안 남</option>
                       <option value="purchased">구매함</option>
-                      <option value="polished">직접 연마함</option>
+                      <option value="polished">직접 옵션 시도함</option>
                     </select>
                     {current.mode === 'polished' && (
                       <label className="inline-attempt-input">
@@ -481,12 +482,15 @@ function App() {
         <details className="notice-panel footer-notice-panel">
           <summary>공지사항 / 업데이트 내역</summary>
           <div className="notice-list version-history-list">
+            <p><strong>v51</strong> 리포트 생성 시 캐릭터/장비/장신구/팔찌/스톤/기억 입력을 로컬 Parquet 데이터셋으로 저장하고, /api/dataset/status로 상태를 확인할 수 있게 했습니다.</p>
+            <p><strong>v50</strong> 장신구 현재 옵션을 공식 확률표와 직접 매칭하고, 중복 제외 보정 기반 기대 시도 수를 백엔드 응답에 추가했습니다.</p>
+            <p><strong>v49</strong> 공식 장신구/팔찌 확률표 데이터 구조를 정리하고, 실제 비용 미입력 시 percentile 판정을 숨기도록 보완했습니다.</p>
             <p><strong>v48</strong> 아이템 레벨 숫자 파싱 오류를 수정하고, non-root Docker 환경에서 /app/data 권한을 자동 보정하도록 data-init 단계를 추가했습니다.</p>
             <p><strong>v47</strong> SonarCloud 1차 정리로 정규식 입력 길이 제한/공통 추출 헬퍼를 추가하고, 항상 참 조건·mutable default 의심 지점·Docker root 실행 경고를 보완했습니다.</p>
             <p><strong>v46</strong> 팔찌 획득 방식을 베이스 구매/직접 획득 후 랜덤 옵션 시도 구조로 정리하고, 직접 돌린 팔찌는 시도 수를 기대값과 비교해 억까/상쇄 점수에 반영했습니다.</p>
             <p><strong>v45</strong> 계산 근거 영역을 표 중심에서 모바일 친화 카드형으로 정리하고, 모바일 화면 레이아웃을 보강했습니다.</p>
-            <p><strong>v44</strong> 장신구별 획득 방식을 추가했습니다. 직접 연마한 장신구는 시도 수를 입력하면 공식 연마 확률표 기반 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>
-            <p><strong>v43</strong> 최종 억까 지수 공식을 장비+스톤 중심으로 정리하고, 상쇄 단서를 최종 점수에서 차감하도록 수정했습니다. 장신구 공식 연마 확률표를 로컬 데이터로 추가했습니다.</p>
+            <p><strong>v44</strong> 장신구별 획득 방식을 추가했습니다. 직접 옵션 시도한 장신구는 시도 수를 입력하면 공식 확률표 기반 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>
+            <p><strong>v43</strong> 최종 억까 지수 공식을 장비+스톤 중심으로 정리하고, 상쇄 단서를 최종 점수에서 차감하도록 수정했습니다. 장신구 공식 확률표를 로컬 데이터로 추가했습니다.</p>
             <p><strong>v42</strong> 스톤 시도 수가 기대값을 크게 초과하면 “가능성 있음”이 아니라 강한/극단적 억까로 판정하도록 수정했습니다. 비정상적으로 큰 입력은 재확인 안내를 함께 표시합니다.</p>
             <p><strong>v41</strong> 장기백 입력에서 횟수와 시점 선택을 제거하고, 기록을 부위+강화구간 단위로 단순화했습니다. 강화 구간은 +11부터 현재 강화 단계까지 표시합니다.</p>
             <p><strong>v40</strong> 에기르 장비와 운명의 전율 장비의 재련표 라벨을 분리하고, 캐릭터 장비 이름 기준으로 재련표 구간을 자동 선택하도록 수정했습니다. 백엔드 준비 전 API 502가 보이는 문제를 줄이기 위해 재시도와 헬스체크를 추가했습니다.</p>
@@ -507,7 +511,7 @@ function App() {
             <p><strong>v25</strong> 보조재료 시세 수집과 접이식 제련 확률표를 추가했습니다.</p>
             <p><strong>v24</strong> 제련 단계별 재료량과 성공 확률표를 추가했습니다.</p>
             <p><strong>v23</strong> 기대값 프리셋과 장비·스톤·장신구 계산 기준을 정리했습니다.</p>
-            <p><strong>v22</strong> 비교 항목 체크박스와 장신구 연마 효과 표시를 개선했습니다.</p>
+            <p><strong>v22</strong> 비교 항목 체크박스와 장신구 효과 표시를 개선했습니다.</p>
             <p><strong>v21</strong> 기대값 계산 결과를 DB/캐시에 저장해 반복 계산 시간을 줄였습니다.</p>
             <p><strong>v20</strong> 팔찌 효과 상세 파싱과 표시를 개선했습니다.</p>
             <p><strong>v19</strong> 프론트엔드 API 프록시 경로 문제를 수정했습니다.</p>
