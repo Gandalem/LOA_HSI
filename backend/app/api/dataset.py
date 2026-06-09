@@ -15,3 +15,9 @@ def dataset_status():
     D:\\LOA-HSI\\data when using the default docker-compose.yml on Windows.
     """
     return DatasetWriter().status()
+
+
+@router.get("/stats")
+def dataset_stats():
+    """Return compact dataset statistics for the dashboard."""
+    return DatasetWriter().stats()
