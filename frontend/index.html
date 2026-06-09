@@ -10,6 +10,12 @@
     <script>
       (function () {
         var lastSignature = '';
+        var currentCharacter = null;
+        var loadedMemoryKey = '';
+        var loadedMemoryHints = null;
+        var ignoredMemoryKeys = {};
+        var pendingComparePayload = null;
+
         function number(value, digits) {
           var n = Number(value);
           if (!Number.isFinite(n)) return '-';
@@ -40,6 +46,139 @@
             return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch];
           });
         }
+        function cloneJson(value) {
+          try { return JSON.parse(JSON.stringify(value || {})); } catch (e) { return {}; }
+        }
+        function characterNameOf(character) {
+          return String((character && (character.character_name || character.characterName)) || '').trim();
+        }
+        function serverNameOf(character) {
+          return String((character && (character.server_name || character.serverName)) || 'unknown').trim() || 'unknown';
+        }
+        function memoryKeyFor(characterName, serverName) {
+          return 'loa-hsi:memory:v1:' + encodeURIComponent(serverName || 'unknown') + ':' + encodeURIComponent(characterName || 'unknown');
+        }
+        function currentMemoryKey(payloadCharacterName) {
+          var name = payloadCharacterName || characterNameOf(currentCharacter);
+          var server = serverNameOf(currentCharacter);
+          return memoryKeyFor(name, server);
+        }
+        function formatSavedAt(value) {
+          if (!value) return '-';
+          try { return new Date(value).toLocaleString('ko-KR'); } catch (e) { return value; }
+        }
+        function getSavedMemory(character) {
+          var name = characterNameOf(character);
+          if (!name) return null;
+          var key = memoryKeyFor(name, serverNameOf(character));
+          try {
+            var raw = localStorage.getItem(key);
+            if (!raw) return null;
+            var parsed = JSON.parse(raw);
+            parsed.__key = key;
+            return parsed;
+          } catch (e) {
+            return null;
+          }
+        }
+        function saveMemoryRecord(payload, character) {
+          if (!payload || !payload.memoryHints) return;
+          var name = characterNameOf(character) || payload.characterName;
+          if (!name) return;
+          var server = serverNameOf(character);
+          var key = memoryKeyFor(name, server);
+          var record = {
+            version: 1,
+            characterName: name,
+            serverName: server,
+            savedAt: new Date().toISOString(),
+            memoryHints: cloneJson(payload.memoryHints)
+          };
+          try {
+            localStorage.setItem(key, JSON.stringify(record));
+            renderMemoryPanel(character || currentCharacter, '현재 기억 기록을 이 브라우저에 저장했습니다.');
+          } catch (e) {
+            renderMemoryPanel(character || currentCharacter, '브라우저 저장소에 기록을 저장하지 못했습니다.');
+          }
+        }
+        function applyBraceletSlotInputsFromMemory(memoryHints) {
+          var bracelet = (memoryHints && memoryHints.braceletAcquisition) || {};
+          var fixed = document.querySelector('[data-loa-hsi-bracelet-fixed-count]');
+          var random = document.querySelector('[data-loa-hsi-bracelet-random-count]');
+          if (fixed && bracelet.fixedOptionCount != null) fixed.value = String(bracelet.fixedOptionCount || '');
+          if (random && bracelet.randomOptionSlotCount != null) random.value = String(bracelet.randomOptionSlotCount || '');
+        }
+        function renderMemoryPanel(character, statusText) {
+          if (!character) return;
+          var memoryPanelHost = document.querySelector('.memory-panel');
+          if (!memoryPanelHost) return;
+          var old = document.querySelector('[data-loa-hsi-memory-panel="true"]');
+          var saved = getSavedMemory(character);
+          var key = memoryKeyFor(characterNameOf(character), serverNameOf(character));
+          var isLoaded = loadedMemoryKey === key && !!loadedMemoryHints;
+          var isIgnored = !!ignoredMemoryKeys[key];
+          var panel = document.createElement('div');
+          panel.className = 'notice-panel loa-hsi-memory-panel';
+          panel.dataset.loaHsiMemoryPanel = 'true';
+          var body = '<strong>기억 기록 저장 상태</strong>'
+            + '<p class="hint">v58부터 기억 기반 보조 판정은 서버가 아니라 이 브라우저 localStorage에만 저장합니다. 클라우드 배포 후에도 다른 사용자와 공유되지 않습니다.</p>';
+          if (saved && !isIgnored) {
+            body += '<p class="hint">이 캐릭터에 저장된 기록이 있습니다. 마지막 저장: ' + escapeHtml(formatSavedAt(saved.savedAt)) + '</p>'
+              + '<div class="row">'
+              + '<button type="button" class="ghost tiny-button" data-memory-action="load">불러오기</button>'
+              + '<button type="button" class="ghost tiny-button" data-memory-action="ignore">무시</button>'
+              + '<button type="button" class="ghost tiny-button" data-memory-action="delete">삭제</button>'
+              + '</div>';
+          } else if (isIgnored) {
+            body += '<p class="hint">이번 세션에서는 저장된 기록을 무시합니다. 리포트 생성 시 현재 입력값이 다시 저장됩니다.</p>'
+              + '<div class="row"><button type="button" class="ghost tiny-button" data-memory-action="unignore">다시 보기</button></div>';
+          } else {
+            body += '<p class="hint">저장된 기록이 없습니다. 억까 리포트 생성 시 현재 입력값이 자동 저장됩니다.</p>';
+          }
+          if (isLoaded) {
+            body += '<p class="hint"><strong>불러온 기록이 다음 리포트 생성에 적용됩니다.</strong> 화면의 일부 입력칸은 즉시 바뀌지 않을 수 있지만, 분석 요청에는 불러온 기억값이 반영됩니다.</p>';
+          }
+          if (statusText) body += '<p class="hint"><strong>' + escapeHtml(statusText) + '</strong></p>';
+          panel.innerHTML = body;
+          panel.addEventListener('click', function (event) {
+            var action = event.target && event.target.getAttribute('data-memory-action');
+            if (!action) return;
+            if (action === 'load' && saved) {
+              loadedMemoryKey = key;
+              loadedMemoryHints = cloneJson(saved.memoryHints);
+              ignoredMemoryKeys[key] = false;
+              applyBraceletSlotInputsFromMemory(loadedMemoryHints);
+              renderMemoryPanel(character, '저장된 기억 기록을 불러왔습니다.');
+            } else if (action === 'ignore') {
+              ignoredMemoryKeys[key] = true;
+              if (loadedMemoryKey === key) {
+                loadedMemoryKey = '';
+                loadedMemoryHints = null;
+              }
+              renderMemoryPanel(character, '이번 세션에서 저장 기록을 무시합니다.');
+            } else if (action === 'unignore') {
+              ignoredMemoryKeys[key] = false;
+              renderMemoryPanel(character, '저장 기록을 다시 표시합니다.');
+            } else if (action === 'delete') {
+              try { localStorage.removeItem(key); } catch (e) {}
+              if (loadedMemoryKey === key) {
+                loadedMemoryKey = '';
+                loadedMemoryHints = null;
+              }
+              renderMemoryPanel(character, '저장된 기억 기록을 삭제했습니다.');
+            }
+          });
+          if (old) old.replaceWith(panel);
+          else memoryPanelHost.prepend(panel);
+        }
+        function setCurrentCharacter(character) {
+          if (!character || !characterNameOf(character)) return;
+          currentCharacter = character;
+          setTimeout(function () {
+            injectBraceletSlotInputs();
+            renderMemoryPanel(currentCharacter);
+          }, 200);
+        }
         function readBraceletSlotInputs() {
           var fixed = document.querySelector('[data-loa-hsi-bracelet-fixed-count]');
           var random = document.querySelector('[data-loa-hsi-bracelet-random-count]');
@@ -60,6 +199,7 @@
             + '<select data-loa-hsi-bracelet-fixed-count><option value="">자동 추정 사용</option><option value="1">고정 1개</option><option value="2">고정 2개</option></select>'
             + '<select data-loa-hsi-bracelet-random-count><option value="">자동 추정 사용</option><option value="1">랜덤 1개</option><option value="2">랜덤 2개</option><option value="3">랜덤 3개</option></select>';
           braceletPanel.appendChild(row);
+          if (loadedMemoryHints) applyBraceletSlotInputsFromMemory(loadedMemoryHints);
         }
         function cardSignature(data) {
           if (!data) return '';
@@ -154,16 +294,17 @@
           var timer = setInterval(function () {
             tries += 1;
             var badge = document.querySelector('.hero .eyebrow');
-            if (badge) badge.textContent = 'LOA-HSI v57';
+            if (badge) badge.textContent = 'LOA-HSI v58';
             var list = document.querySelector('.version-history-list');
-            if (list && !list.querySelector('[data-version="v57"]')) {
+            if (list && !list.querySelector('[data-version="v58"]')) {
               var item = document.createElement('p');
-              item.dataset.version = 'v57';
-              item.innerHTML = '<strong>v57</strong> 팔찌 고정/랜덤 슬롯 수를 자동 추정하고, 특수옵션 3개 감지 시 랜덤 3개 구성으로 보정합니다.';
+              item.dataset.version = 'v58';
+              item.innerHTML = '<strong>v58</strong> 기억 기반 보조 판정을 브라우저 localStorage에 캐릭터별로 저장하고 불러올 수 있게 했습니다.';
               list.prepend(item);
             }
             injectBraceletSlotInputs();
-            if ((badge && list && document.querySelector('[data-loa-hsi-bracelet-slot-inputs="true"]')) || tries >= 30) clearInterval(timer);
+            if (currentCharacter) renderMemoryPanel(currentCharacter);
+            if ((badge && list) || tries >= 30) clearInterval(timer);
           }, 150);
         }
         window.__LOA_HSI_VERSION_PATCH__ = patchStaticLabels;
@@ -172,21 +313,36 @@
           var input = arguments[0];
           var url = typeof input === 'string' ? input : (input && input.url) || '';
           var args = Array.prototype.slice.call(arguments);
+          var comparePayloadForSave = null;
           if (String(url).indexOf('/simulations/compare-character') >= 0 && args[1] && args[1].body) {
             try {
               var payload = JSON.parse(args[1].body);
+              var key = currentMemoryKey(payload.characterName);
               var slots = readBraceletSlotInputs();
-              payload.memoryHints = payload.memoryHints || {};
-              payload.memoryHints.braceletAcquisition = payload.memoryHints.braceletAcquisition || {};
-              payload.memoryHints.braceletAcquisition.fixedOptionCount = slots.fixedOptionCount;
-              payload.memoryHints.braceletAcquisition.randomOptionSlotCount = slots.randomOptionSlotCount;
+              var memoryHints = cloneJson(payload.memoryHints || {});
+              if (loadedMemoryKey === key && loadedMemoryHints) memoryHints = cloneJson(loadedMemoryHints);
+              memoryHints.braceletAcquisition = memoryHints.braceletAcquisition || {};
+              if (slots.fixedOptionCount !== '') memoryHints.braceletAcquisition.fixedOptionCount = slots.fixedOptionCount;
+              if (slots.randomOptionSlotCount !== '') memoryHints.braceletAcquisition.randomOptionSlotCount = slots.randomOptionSlotCount;
+              payload.memoryHints = memoryHints;
+              comparePayloadForSave = cloneJson(payload);
+              pendingComparePayload = comparePayloadForSave;
               args[1] = Object.assign({}, args[1], { body: JSON.stringify(payload) });
             } catch (e) {}
           }
           return originalFetch.apply(window, args).then(function (response) {
+            if (String(url).indexOf('/characters/') >= 0 && String(url).indexOf('/summary') >= 0 && response.ok) {
+              response.clone().json().then(function (data) {
+                setCurrentCharacter(data);
+              }).catch(function () {});
+            }
             if (String(url).indexOf('/simulations/compare-character') >= 0) {
               response.clone().json().then(function (data) {
+                if (data && data.character) setCurrentCharacter(data.character);
                 renderBraceletCard(data && data.expectedValues && data.expectedValues.officialBraceletT4);
+                if (response.ok && (comparePayloadForSave || pendingComparePayload)) {
+                  saveMemoryRecord(comparePayloadForSave || pendingComparePayload, data && data.character ? data.character : currentCharacter);
+                }
               }).catch(function () {});
             }
             return response;
