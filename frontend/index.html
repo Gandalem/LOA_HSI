@@ -9,6 +9,7 @@
     <div id="root"></div>
     <script>
       (function () {
+        var lastSignature = '';
         function number(value, digits) {
           var n = Number(value);
           if (!Number.isFinite(n)) return '-';
@@ -23,28 +24,37 @@
           var map = { core: '핵심', secondary: '보조', conditional: '조건부', unmatched: '미분류' };
           return map[value] || value || '-';
         }
-        function categoryLabel(row) {
-          return row.categoryLabel || row.category || '-';
-        }
         function escapeHtml(value) {
           return String(value == null ? '' : value).replace(/[&<>"]/g, function (ch) {
             return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch];
           });
         }
-        function braceletCardHtml(data) {
+        function cardSignature(data) {
+          if (!data) return '';
+          return JSON.stringify({
+            version: data.version,
+            matched: data.matchedEffectCount,
+            unmatched: data.unmatchedEffectCount,
+            core: data.coreEffectCount,
+            probability: data.combinedCategoryProbability,
+            effects: (data.matchedEffects || []).map(function (row) { return [row.rawEffect, row.category, row.matchRole]; })
+          });
+        }
+        function braceletCardHtml(data, signature) {
           var effects = (data.matchedEffects || []).slice(0, 8);
           var limits = data.limits || [];
           var effectHtml = effects.length ? effects.map(function (row) {
+            var category = row.categoryLabel || row.category || '-';
             return '<div class="combo-chip">'
               + '<span>' + escapeHtml(row.rawEffect) + '</span>'
-              + '<strong>' + escapeHtml(categoryLabel(row)) + ' · ' + escapeHtml(roleLabel(row.matchRole)) + '</strong>'
+              + '<strong>' + escapeHtml(category) + ' · ' + escapeHtml(roleLabel(row.matchRole)) + '</strong>'
               + '<small>표기확률 ' + percent(row.categoryDisplayProbability) + '</small>'
               + '</div>';
           }).join('') : '<p class="hint">공식 카테고리와 매칭된 팔찌 효과가 없습니다.</p>';
           var limitHtml = limits.length ? '<ul>' + limits.map(function (line) { return '<li>' + escapeHtml(line) + '</li>'; }).join('') + '</ul>' : '';
-          return '<div class="expected-panel evidence-panel loa-hsi-bracelet-v54" data-loa-hsi-bracelet-v54="true">'
+          return '<div class="expected-panel evidence-panel loa-hsi-bracelet-v54" data-loa-hsi-bracelet-v54="true" data-signature="' + escapeHtml(signature) + '">'
             + '<h3>팔찌 T4 공식 매칭</h3>'
-            + '<p class="hint evidence-intro">v54 기준 팔찌 공식 매칭은 효과 개수 확률과 기본/전투특성/특수효과 카테고리 확률을 사용합니다.</p>'
+            + '<p class="hint evidence-intro">v54.1 기준 팔찌 공식 매칭은 효과 개수 확률과 기본/전투특성/특수효과 카테고리 확률을 사용합니다.</p>'
             + '<div class="evidence-card-grid">'
             + '<section class="evidence-card">'
             + '<div class="evidence-card-head"><strong>공식 구조</strong><span>' + escapeHtml(data.gradeLabel || '-') + '</span></div>'
@@ -69,29 +79,43 @@
             + '<div class="notice-panel"><strong>계산 제한</strong>' + limitHtml + '</div>'
             + '</div>';
         }
-        function renderBraceletCard() {
-          var data = window.__LOA_HSI_LAST_BRACELET_T4__;
-          var host = document.querySelector('.expected-panel.evidence-panel');
-          if (!data || !host) return;
-          var old = document.querySelector('[data-loa-hsi-bracelet-v54="true"]');
-          if (old) old.remove();
-          var wrap = document.createElement('div');
-          wrap.innerHTML = braceletCardHtml(data);
-          host.insertAdjacentElement('afterend', wrap.firstElementChild);
+        function renderBraceletCard(data) {
+          if (!data) return;
+          var signature = cardSignature(data);
+          if (!signature || signature === lastSignature) return;
+          var attempts = 0;
+          var timer = setInterval(function () {
+            attempts += 1;
+            var host = document.querySelector('.expected-panel.evidence-panel');
+            if (!host && attempts < 20) return;
+            clearInterval(timer);
+            if (!host) return;
+            var old = document.querySelector('[data-loa-hsi-bracelet-v54="true"]');
+            if (old && old.dataset.signature === signature) return;
+            var wrap = document.createElement('div');
+            wrap.innerHTML = braceletCardHtml(data, signature);
+            if (old) old.replaceWith(wrap.firstElementChild);
+            else host.insertAdjacentElement('afterend', wrap.firstElementChild);
+            lastSignature = signature;
+          }, 100);
         }
-        function applyVersionPatch() {
-          var badge = document.querySelector('.hero .eyebrow');
-          if (badge && badge.textContent !== 'LOA-HSI v54') badge.textContent = 'LOA-HSI v54';
-          var list = document.querySelector('.version-history-list');
-          if (list && !list.querySelector('[data-version="v54"]')) {
-            var item = document.createElement('p');
-            item.dataset.version = 'v54';
-            item.innerHTML = '<strong>v54</strong> 팔찌 T4 공식 매칭 결과를 리포트 화면에 별도 카드로 표시했습니다.';
-            list.prepend(item);
-          }
-          renderBraceletCard();
+        function patchStaticLabels() {
+          var tries = 0;
+          var timer = setInterval(function () {
+            tries += 1;
+            var badge = document.querySelector('.hero .eyebrow');
+            if (badge) badge.textContent = 'LOA-HSI v54.1';
+            var list = document.querySelector('.version-history-list');
+            if (list && !list.querySelector('[data-version="v54.1"]')) {
+              var item = document.createElement('p');
+              item.dataset.version = 'v54.1';
+              item.innerHTML = '<strong>v54.1</strong> 팔찌 T4 공식 매칭 카드의 반복 렌더링 루프를 차단했습니다.';
+              list.prepend(item);
+            }
+            if ((badge && list) || tries >= 20) clearInterval(timer);
+          }, 150);
         }
-        window.__LOA_HSI_VERSION_PATCH__ = applyVersionPatch;
+        window.__LOA_HSI_VERSION_PATCH__ = patchStaticLabels;
         var originalFetch = window.fetch.bind(window);
         window.fetch = function () {
           var input = arguments[0];
@@ -99,16 +123,13 @@
           return originalFetch.apply(window, arguments).then(function (response) {
             if (String(url).indexOf('/simulations/compare-character') >= 0) {
               response.clone().json().then(function (data) {
-                window.__LOA_HSI_LAST_BRACELET_T4__ = data && data.expectedValues && data.expectedValues.officialBraceletT4;
-                setTimeout(applyVersionPatch, 0);
+                renderBraceletCard(data && data.expectedValues && data.expectedValues.officialBraceletT4);
               }).catch(function () {});
             }
             return response;
           });
         };
-        var observer = new MutationObserver(function () { applyVersionPatch(); });
-        observer.observe(document.documentElement, { childList: true, subtree: true });
-        document.addEventListener('DOMContentLoaded', function () { applyVersionPatch(); });
+        document.addEventListener('DOMContentLoaded', patchStaticLabels);
       })();
     </script>
     <script type="module" src="/src/main.jsx"></script>
