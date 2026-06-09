@@ -1,20 +1,26 @@
 {
   "metadata": {
-    "title": "로스트아크 장신구 연마 공식 확률표 로컬 데이터",
+    "title": "로스트아크 장신구 효과 공식 확률표 로컬 데이터",
+    "version": "v49-official-probability-foundation",
     "sourceUrl": "https://m-lostark.game.onstove.com/Probability/%EC%9E%A5%EC%8B%A0%EA%B5%AC%20%EC%97%B0%EB%A7%88",
     "sourceLastModified": "2024-07-10 08:00:00",
-    "capturedForVersion": "v43",
+    "capturedForVersion": "v49",
     "notes": [
-      "장신구 연마 시 이미 부여된 효과는 중복 부여되지 않는다.",
-      "장신구 등급 유물/고대와 관계없이 연마 옵션 종류 및 등장 확률은 동일하다.",
-      "부위별로 일부 연마 옵션의 종류가 다르다.",
-      "실제 등장 확률은 표기확률 / (100% - 중복 제외로 제거된 효과의 표기확률 합)으로 보정한다."
+      "장신구 효과 부여 시 이미 부여된 효과는 중복 부여되지 않는다.",
+      "장신구 등급 유물/고대와 관계없이 옵션 종류 및 등장 확률은 동일하다.",
+      "부위별로 일부 옵션의 종류가 다르다.",
+      "실제 등장 확률은 표기확률 / (100% - 중복 제외로 제거된 효과의 표기확률 합)으로 보정한다.",
+      "v49에서는 공식 확률표 데이터 구조를 정리하고, 현재 옵션별 세부 매칭 계산은 다음 버전에서 연결한다."
     ]
   },
   "gradeProbabilities": {
     "하": 0.063,
     "중": 0.03,
     "상": 0.007
+  },
+  "duplicateRule": {
+    "formula": "actualProbability = displayProbability / (1 - excludedDisplayProbabilitySum)",
+    "description": "이미 부여된 효과의 표기확률 합을 제외한 뒤 남은 확률 공간에서 목표 효과 확률을 다시 계산한다."
   },
   "parts": {
     "목걸이": [
