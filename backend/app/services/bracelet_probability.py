@@ -66,7 +66,6 @@ def _category_key(effect: str) -> str:
         return "special"
     if any(keyword in text for keyword in BASIC_KEYWORDS):
         return "basic"
-    # 팔찌 특수 효과는 툴팁 문장이 길게 표시되는 경우가 많아 미분류 문장은 특수 효과 후보로 보수 분류합니다.
     if "피해" in text or "공격" in text or "낙인" in text or "아군" in text or "마나" in text:
         return "special"
     return "unknown"
@@ -115,33 +114,28 @@ def _attempts_from_probability(prob: float | None) -> float | None:
     return 1.0 / prob
 
 
-def _assigned_count_probability(grade: str, effect_count: int) -> float | None:
-    counts = ((_official_table().get("effectCounts") or {}).get(grade) or {}).get("assigned") or {}
-    if not counts:
-        return None
-    eligible = [float(prob) for count, prob in counts.items() if int(count) >= int(effect_count)]
-    return sum(eligible) if eligible else 0.0
-
-
-def _category_probability_sequence(categories: list[str]) -> float | None:
+def _category_probability_sum(categories: list[str]) -> float | None:
     category_probs = _official_table().get("categoryProbabilities") or {}
-    targets = [c for c in categories if c in category_probs]
-    if not targets:
+    unique = []
+    for category in categories:
+        if category in category_probs and category not in unique:
+            unique.append(category)
+    if not unique:
         return None
-    excluded_by_category: dict[str, int] = {}
-    probability = 1.0
-    for category in targets:
-        row = category_probs[category]
-        display_prob = float(row.get("probability") or 0.0)
-        max_count = int(row.get("maxCount") or 99)
-        already = excluded_by_category.get(category, 0)
-        if already >= max_count:
-            return 0.0
-        # 공식은 같은 효과 중복 제외를 공개합니다. v53은 카테고리 단위 매칭 단계라
-        # 동일 카테고리의 최대 개수 제한만 보수적으로 반영하고, 옵션 개별 표기확률은 추정하지 않습니다.
-        probability *= display_prob
-        excluded_by_category[category] = already + 1
-    return probability
+    return sum(float(category_probs[category].get("probability") or 0.0) for category in unique)
+
+
+def _weighted_at_least_one_by_assigned_count(base_prob: float | None, assigned_dist: dict[str, float]) -> tuple[float | None, dict[str, float]]:
+    if base_prob is None or base_prob <= 0 or not assigned_dist:
+        return None, {}
+    by_count: dict[str, float] = {}
+    total = 0.0
+    for count_text, count_prob in assigned_dist.items():
+        count = int(count_text)
+        p = 1.0 - ((1.0 - base_prob) ** count)
+        by_count[count_text] = p
+        total += float(count_prob) * p
+    return total, by_count
 
 
 def build_official_bracelet_t4_summary(character: CharacterSummary, class_preset: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -152,6 +146,8 @@ def build_official_bracelet_t4_summary(character: CharacterSummary, class_preset
     effects = [str(x).strip() for x in ((item.bracelet_effects if item else []) or []) if str(x).strip()]
     category_rows = table.get("categoryProbabilities") or {}
     effect_counts = (table.get("effectCounts") or {}).get(grade) or {}
+    fixed_dist = effect_counts.get("fixed") or {}
+    assigned_dist = effect_counts.get("assigned") or {}
     leap = (table.get("leapPoints") or {}).get(grade) or {}
     matched = []
     unmatched = []
@@ -177,41 +173,68 @@ def build_official_bracelet_t4_summary(character: CharacterSummary, class_preset
             "isSecondary": role_match == "secondary",
             "isConditional": role_match == "conditional",
             "probabilityBasis": "official_category_probability",
+            "ownershipBasis": "visible_current_effect_mixed_fixed_and_random",
         })
     target = [row for row in matched if row["matchRole"] in {"core", "secondary", "conditional"}]
     core = [row for row in matched if row["matchRole"] == "core"]
     target_categories = [row["category"] for row in (core or target)]
-    category_sequence_probability = _category_probability_sequence(target_categories)
-    assigned_count_prob = _assigned_count_probability(grade, len(target_categories)) if target_categories else None
-    combined_probability = None
-    if category_sequence_probability is not None and assigned_count_prob is not None:
-        combined_probability = category_sequence_probability * assigned_count_prob
+    per_random_slot_category_probability = _category_probability_sum(target_categories)
+    random_option_success_probability, by_assigned_count = _weighted_at_least_one_by_assigned_count(
+        per_random_slot_category_probability,
+        assigned_dist,
+    )
     return {
-        "version": "v53-official-bracelet-t4-category-matching",
+        "version": "v55-bracelet-fixed-random-split",
         "role": role,
         "source": (table.get("metadata") or {}).get("sourceUrl"),
         "grade": grade,
         "gradeLabel": (leap.get("label") or ("유물" if grade == "relic" else "고대")),
         "leapPoints": leap.get("points"),
         "effectCountRules": effect_counts,
-        "expectedFixedEffectCount": _expected_count(effect_counts.get("fixed") or {}),
-        "expectedAssignedEffectCount": _expected_count(effect_counts.get("assigned") or {}),
+        "fixedEffectCountDistribution": fixed_dist,
+        "assignedEffectCountDistribution": assigned_dist,
+        "expectedFixedEffectCount": _expected_count(fixed_dist),
+        "expectedAssignedEffectCount": _expected_count(assigned_dist),
         "categoryProbabilities": category_rows,
         "duplicateRule": table.get("duplicateRule") or {},
+        "purchaseStructure": {
+            "baseBraceletHasFixedOptions": True,
+            "baseBraceletHasRandomOptionSlots": True,
+            "bindsToRosterAfterPurchase": True,
+            "fixedOptionsAreNotUserRngAfterPurchase": True,
+            "onlyRandomOptionRerollsShouldBeComparedWithUserAttempts": True,
+            "description": "팔찌는 구매 시 고정 옵션과 랜덤 옵션 슬롯이 섞여 있으며, 구매 후 계정 귀속됩니다. 따라서 현재 효과 전체를 한 번에 직접 뽑은 목표로 계산하지 않습니다.",
+        },
         "matchedEffects": matched,
         "unmatchedEffects": unmatched,
         "targetEffects": core or target,
         "matchedEffectCount": len(matched),
         "unmatchedEffectCount": len(unmatched),
         "coreEffectCount": len(core),
-        "targetCategorySequenceProbability": category_sequence_probability,
-        "assignedCountProbability": assigned_count_prob,
-        "combinedCategoryProbability": combined_probability,
-        "expectedAttemptsCategoryBasis": _attempts_from_probability(combined_probability),
+        "wholeBraceletEffectProbability": None,
+        "wholeBraceletEffectExpectedAttempts": None,
+        "wholeBraceletEffectReason": "현재 팔찌 효과에는 구매 당시 고정 옵션과 구매 후 직접 돌린 랜덤 옵션이 섞일 수 있어 전체 효과를 하나의 랜덤 목표로 계산하지 않습니다.",
+        "randomOptionBasis": {
+            "targetCategories": list(dict.fromkeys(target_categories)),
+            "perRandomSlotCategoryProbability": per_random_slot_category_probability,
+            "successProbabilityByAssignedCount": by_assigned_count,
+            "weightedSuccessProbability": random_option_success_probability,
+            "expectedAttempts": _attempts_from_probability(random_option_success_probability),
+            "formula": "랜덤 옵션 기준 확률 = Σ P(랜덤 슬롯 수=n) × [1-(1-p)^n]. p는 핵심/유효 카테고리 중 하나가 한 슬롯에 붙을 카테고리 기준 확률입니다.",
+            "interpretation": "사용자가 팔찌를 직접 돌린 시도 수를 입력했을 때 비교할 기준입니다. 구매 당시 이미 붙어 있던 고정 옵션은 억까 판정 대상으로 보지 않습니다.",
+        },
+        # Backward-compatible fields for older frontend cards. They intentionally no longer mean
+        # whole-bracelet probability and should be treated as random-option-basis values.
+        "targetCategorySequenceProbability": None,
+        "assignedCountProbability": random_option_success_probability,
+        "combinedCategoryProbability": random_option_success_probability,
+        "expectedAttemptsCategoryBasis": _attempts_from_probability(random_option_success_probability),
         "warning": None if matched else "현재 팔찌 효과를 공식 T4 카테고리와 매칭하지 못했습니다.",
         "limits": [
-            "v53은 공식 팔찌 T4의 효과 개수/카테고리 확률을 현재 효과에 연결하는 단계입니다.",
-            "옵션 개별 수치 구간별 표기확률은 공식 JSON에 아직 분리되지 않아 카테고리 기준 확률로만 표시합니다.",
+            "v55부터 현재 팔찌 효과 전체 5개를 하나의 랜덤 목표로 계산하지 않습니다.",
+            "팔찌는 구매 시 고정 옵션과 랜덤 옵션 슬롯이 섞여 있으며, 구매 후 계정 귀속됩니다.",
+            "억까 판정에는 사용자가 직접 돌린 랜덤 옵션 시도 수만 기대값과 비교해야 합니다.",
+            "옵션 개별 수치 구간별 표기확률은 공식 JSON에 아직 분리되지 않아 카테고리 기준 확률로 표시합니다.",
         ],
-        "formula": "카테고리 기준 조합 확률 = P(부여 효과 개수 충분) × 현재 핵심/유효 효과 카테고리 표기확률의 곱",
+        "formula": "전체 효과 확률은 계산하지 않음. 랜덤 옵션 슬롯 기준 기대값만 계산합니다.",
     }
