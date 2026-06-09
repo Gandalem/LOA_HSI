@@ -10,11 +10,12 @@ from app.services.simulation_engine import SimulationEngine
 from app.services.simulation_store import SimulationStore, make_cache_key
 from app.services.expectation_calculator import build_expected_value_summary
 from app.services.accessory_probability import build_official_accessory_effect_summary
+from app.services.bracelet_probability import build_official_bracelet_t4_summary
 from app.services.dataset_writer import DatasetWriter
 from app.services.class_preset import resolve_class_engraving_preset
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
-MODEL_VERSION = "v51-local-dataset-snapshots"
+MODEL_VERSION = "v53-official-bracelet-t4-category-matching"
 
 
 def _points_from_stone_type(value: str | None):
@@ -81,8 +82,9 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         "장비 재련은 로컬 T4 재련표와 DB 재료 시세를 기준으로 기본 재료/기본 성공확률만 계산합니다.",
         "어빌리티 스톤은 API로 가져온 현재 활성 레벨 결과를 목표로 보고, 사용자가 기억한 시도 개수와 비교합니다.",
         "장신구 효과는 공식 확률표와 매칭한 뒤 중복 제외 보정 기반 기대 시도 수를 계산합니다.",
+        "팔찌 T4는 공식 효과 개수/카테고리 확률과 현재 팔찌 효과 카테고리 매칭을 연결합니다.",
         "v51부터 리포트 생성 시 캐릭터/장비/장신구/팔찌/스톤/기억 입력을 로컬 Parquet 데이터셋으로 저장합니다.",
-        "팔찌 공식 옵션 매칭과 장신구 실제 거래가 기반 평가는 아직 별도 기능으로 분리 예정입니다.",
+        "팔찌 옵션 개별 수치 구간별 표기확률은 아직 카테고리 기준 확률과 분리해 표시합니다.",
         "실제 사용 골드를 입력받지 않는 기본 모드에서는 유저 비용 percentile 판정보다 재현 비용 분포와 기억 기반 단서를 우선합니다.",
         f"재료 가격 fingerprint: {engine.material_price_fingerprint[:12]}... · DB 시세 {len(engine.material_price_rows)}개 반영",
     ]
@@ -126,18 +128,23 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         character,
         class_preset=character.class_engraving_preset,
     )
+    expected_values["officialBraceletT4"] = build_official_bracelet_t4_summary(
+        character,
+        class_preset=character.class_engraving_preset,
+    )
     expected_values["actualCostMode"] = artifact_paths["actualCostMode"]
     expected_values["calculationBasis"] = {
         "official": [
             "장신구 효과 공식 확률표 매칭",
             "장신구 중복 제외 보정 기대 시도 수",
-            "팔찌 T4 효과 수/카테고리 확률 구조",
+            "팔찌 T4 효과 개수 확률",
+            "팔찌 T4 카테고리 확률 매칭",
             "스톤 활성 레벨-성공 횟수 변환",
         ],
         "estimate": [
             "장비 재련표 기반 재현 비용",
             "장신구 실제 거래가 대신 사용하는 임시 시장가 분포",
-            "현재 팔찌 옵션 텍스트 매칭 기반 난이도 보정",
+            "팔찌 옵션 개별 수치 구간은 카테고리 기준으로 표시",
         ],
         "memory": [
             "장기백 기록",
@@ -159,7 +166,6 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         artifact_paths["datasetTables"] = ",".join(dataset_result["writtenTables"].keys())
         expected_values["datasetSnapshot"] = dataset_result
     except Exception as exc:
-        # 데이터셋 저장 실패가 리포트 생성 자체를 막지는 않게 둡니다.
         artifact_paths["datasetError"] = str(exc)
         expected_values["datasetSnapshot"] = {"error": str(exc)}
 
