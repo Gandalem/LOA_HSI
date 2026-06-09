@@ -1,4 +1,6 @@
 import React from 'react';
+import '../styles/v48-mobile.css';
+
 function fmt(value) {
   if (value === null || value === undefined || value === '') return '-';
   return value;
@@ -11,7 +13,6 @@ function quality(value) {
   if (n < 0 || n > 100) return '-';
   return `${n}`;
 }
-
 
 function effectList(effects, className = 'effects-list') {
   if (!effects?.length) return null;
@@ -36,6 +37,51 @@ function effectLine(name, points, fallbackName) {
   const label = name || fallbackName;
   const value = points === null || points === undefined ? '-' : `+${points}`;
   return { label, value };
+}
+
+function GearMobileCards({ items = [] }) {
+  if (!items.length) return <p className="hint mobile-card-only">조회된 장비가 없습니다.</p>;
+  return (
+    <div className="mobile-card-list mobile-card-only">
+      {items.map((item, idx) => (
+        <article className="spec-mobile-card" key={`${item.slot}-${item.name}-${idx}`}>
+          <div className="spec-card-head">
+            <strong>{item.slot}</strong>
+            <span>{item.honing_level ? `+${item.honing_level}` : '강화 -'}</span>
+          </div>
+          <p>{item.name || '-'}</p>
+          <div className="spec-card-meta">
+            <span>{item.grade || '-'}</span>
+            <span>아이템 레벨 {item.item_level || '-'}</span>
+            <span>품질 {quality(item.quality)}</span>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function AccessoryMobileCards({ items = [] }) {
+  if (!items.length) return <p className="hint mobile-card-only">조회된 장신구가 없습니다.</p>;
+  return (
+    <div className="mobile-card-list mobile-card-only">
+      {items.map((item, idx) => (
+        <article className="spec-mobile-card accessory-mobile-card" key={`${item.slot}-${item.name}-${idx}`}>
+          <div className="spec-card-head">
+            <strong>{item.slot}</strong>
+            <span>품질 {quality(item.quality)}</span>
+          </div>
+          <p>{item.name || '-'}</p>
+          <div className="spec-card-meta">
+            <span>{item.grade || '-'}</span>
+          </div>
+          <div className="spec-card-effects">
+            {item.slot === '팔찌' ? (braceletEffects(item) || <span>-</span>) : (accessoryEffects(item) || <span>-</span>)}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
 }
 
 export default function CharacterPanel({ character }) {
@@ -66,7 +112,7 @@ export default function CharacterPanel({ character }) {
       )}
 
       <h3>장비</h3>
-      <div className="table-wrap">
+      <div className="table-wrap desktop-table-wrap">
         <table>
           <thead>
             <tr><th>부위</th><th>이름</th><th>등급</th><th>아이템 레벨</th><th>강화</th><th>품질</th></tr>
@@ -85,6 +131,7 @@ export default function CharacterPanel({ character }) {
           </tbody>
         </table>
       </div>
+      <GearMobileCards items={character.equipment || []} />
 
       <h3>어빌리티 스톤</h3>
       <div className="stone-box single-stone-box">
@@ -120,10 +167,10 @@ export default function CharacterPanel({ character }) {
       </div>
 
       <h3>장신구</h3>
-      <div className="table-wrap">
+      <div className="table-wrap desktop-table-wrap">
         <table>
           <thead>
-            <tr><th>부위</th><th>이름</th><th>등급</th><th>품질</th><th>연마/팔찌 효과</th></tr>
+            <tr><th>부위</th><th>이름</th><th>등급</th><th>품질</th><th>효과</th></tr>
           </thead>
           <tbody>
             {character.accessories?.map((item, idx) => (
@@ -138,6 +185,7 @@ export default function CharacterPanel({ character }) {
           </tbody>
         </table>
       </div>
+      <AccessoryMobileCards items={character.accessories || []} />
     </section>
   );
 }
