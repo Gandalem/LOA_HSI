@@ -55,7 +55,7 @@ def character_fingerprint(character: CharacterSummary) -> dict[str, Any]:
     }
 
 
-def make_cache_key(character: CharacterSummary, compare_modules: list[str], simulation_count: int, seed: int | None, model_version: str = "v21", price_fingerprint: str | None = None) -> str:
+def make_cache_key(character: CharacterSummary, compare_modules: list[str], simulation_count: int, seed: int | None, model_version: str = "v48", price_fingerprint: str | None = None) -> str:
     payload = {
         "modelVersion": model_version,
         "character": character_fingerprint(character),
@@ -118,7 +118,16 @@ class SimulationStore:
         finally:
             con.close()
 
-    def save(self, cache_key: str, character_name: str, modules: list[str], simulation_count: int, seed: int | None, module_values: dict[str, np.ndarray]) -> None:
+    def save(
+        self,
+        cache_key: str,
+        character_name: str,
+        modules: list[str],
+        simulation_count: int,
+        seed: int | None,
+        module_values: dict[str, np.ndarray],
+        model_version: str = "v48",
+    ) -> None:
         if self.exists(cache_key):
             return
 
@@ -144,7 +153,7 @@ class SimulationStore:
                     simulation_count,
                     seed,
                     datetime.now(timezone.utc).replace(tzinfo=None),
-                    "v26",
+                    model_version,
                 ],
             )
             con.register("rows_df", df)
