@@ -13,7 +13,7 @@ from app.models.schemas import HealthResponse
 from app.core.settings import get_settings
 from app.api.material_prices import collect_material_prices, CollectMaterialPricesRequest
 
-app = FastAPI(title="LOA-HSI Character Compare API", version="0.4.9")
+app = FastAPI(title="LOA-HSI Character Compare API", version="0.5.0")
 
 app.add_middleware(
     CORSMiddleware,
