@@ -7,6 +7,22 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.__LOA_HSI_VERSION_PATCH__ = function applyVersionPatch() {
+        var badge = document.querySelector('.hero .eyebrow');
+        if (badge && badge.textContent !== 'LOA-HSI v52.1') badge.textContent = 'LOA-HSI v52.1';
+        var list = document.querySelector('.version-history-list');
+        if (list && !list.querySelector('[data-version="v52.1"]')) {
+          var item = document.createElement('p');
+          item.dataset.version = 'v52.1';
+          item.innerHTML = '<strong>v52.1</strong> 앱 헤더와 공지사항의 버전 표기를 v52 기준으로 정리했습니다.';
+          list.prepend(item);
+        }
+      };
+      var observer = new MutationObserver(function () { window.__LOA_HSI_VERSION_PATCH__(); });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      document.addEventListener('DOMContentLoaded', function () { window.__LOA_HSI_VERSION_PATCH__(); });
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
