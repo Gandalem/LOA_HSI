@@ -152,6 +152,7 @@ def _weighted_at_least_one_by_assigned_count(base_prob: float | None, assigned_d
 
 def _infer_bracelet_counts(
     total_effect_count: int,
+    special_effect_count: int,
     fixed_dist: dict[str, float],
     assigned_dist: dict[str, float],
     explicit_fixed: int | None,
@@ -164,20 +165,34 @@ def _infer_bracelet_counts(
     fixed = explicit_fixed
     random = explicit_random
     basis = "user_input" if fixed is not None and random is not None else "auto_estimate"
-    note = "사용자가 입력한 고정/랜덤 슬롯 수를 우선 적용했습니다." if basis == "user_input" else "현재 팔찌 총 효과 수와 공식 가능한 조합으로 자동 추정했습니다. 기본은 고정 2개 우선이며, 총 옵션 3개는 고정 1개/랜덤 2개로 보정합니다."
+    reason = "사용자 입력"
+    note = "사용자가 입력한 고정/랜덤 슬롯 수를 우선 적용했습니다."
+
+    if basis != "user_input":
+        reason = "총 옵션 수 기반 자동 추정"
+        note = "현재 팔찌 총 효과 수와 공식 가능한 조합으로 자동 추정했습니다. 기본은 고정 2개 우선이며, 총 옵션 3개는 고정 1개/랜덤 2개로 보정합니다. 특수옵션이 3개면 랜덤 3개 구성을 우선합니다."
 
     if fixed is not None and random is None:
         candidate_random = total_effect_count - fixed
         random = candidate_random if candidate_random in allowed_random else None
         basis = "partial_user_input_auto_completed" if random is not None else "partial_user_input_incomplete"
+        reason = "고정 수동 입력 + 랜덤 자동 보정"
     elif random is not None and fixed is None:
         candidate_fixed = total_effect_count - random
         fixed = candidate_fixed if candidate_fixed in allowed_fixed else None
         basis = "partial_user_input_auto_completed" if fixed is not None else "partial_user_input_incomplete"
+        reason = "랜덤 수동 입력 + 고정 자동 보정"
     elif fixed is None and random is None:
         preferred = None
-        if total_effect_count == 3 and (1, 2) in possible_pairs:
+        special_pair = (total_effect_count - 3, 3)
+        if special_effect_count >= 3 and special_pair in possible_pairs:
+            preferred = special_pair
+            basis = "auto_special_count"
+            reason = "특수옵션 3개 감지"
+            note = "특수옵션이 3개 감지되어 랜덤 부여효과 3개 구성으로 우선 추정했습니다."
+        elif total_effect_count == 3 and (1, 2) in possible_pairs:
             preferred = (1, 2)
+            reason = "총 옵션 3개 보정"
         else:
             with_two_fixed = [pair for pair in possible_pairs if pair[0] == 2]
             if with_two_fixed:
@@ -192,14 +207,17 @@ def _infer_bracelet_counts(
         fallback = possible_pairs[0]
         fixed, random = fallback
         basis = "auto_fallback"
+        reason = "공식 가능한 조합 fallback"
         note = "입력값이 공식 가능한 조합과 맞지 않아 가능한 조합 중 하나로 보정했습니다."
         is_valid = True
 
     return {
         "totalEffectCount": total_effect_count,
+        "specialEffectCount": special_effect_count,
         "fixedOptionCount": fixed,
         "randomOptionSlotCount": random,
         "basis": basis,
+        "reason": reason,
         "isOfficiallyPossible": is_valid,
         "possiblePairs": [{"fixed": f, "random": r} for f, r in possible_pairs],
         "note": note,
@@ -211,13 +229,14 @@ def _user_bracelet_input(
     fixed_dist: dict[str, float],
     assigned_dist: dict[str, float],
     total_effect_count: int,
+    special_effect_count: int,
 ) -> dict[str, Any]:
     bracelet = (memory_hints or {}).get("braceletAcquisition") or {}
     allowed_fixed = {int(k) for k in fixed_dist.keys()}
     allowed_random = {int(k) for k in assigned_dist.keys()}
     explicit_fixed = _safe_int(bracelet.get("fixedOptionCount"), allowed_fixed)
     explicit_random = _safe_int(bracelet.get("randomOptionSlotCount"), allowed_random)
-    inference = _infer_bracelet_counts(total_effect_count, fixed_dist, assigned_dist, explicit_fixed, explicit_random)
+    inference = _infer_bracelet_counts(total_effect_count, special_effect_count, fixed_dist, assigned_dist, explicit_fixed, explicit_random)
     return {
         "mode": bracelet.get("mode") or "unknown",
         "attempts": bracelet.get("attempts"),
@@ -247,7 +266,8 @@ def build_official_bracelet_t4_summary(
     effect_counts = (table.get("effectCounts") or {}).get(grade) or {}
     fixed_dist = effect_counts.get("fixed") or {}
     assigned_dist = effect_counts.get("assigned") or {}
-    user_input = _user_bracelet_input(memory_hints, fixed_dist, assigned_dist, len(effects))
+    special_effect_count = sum(1 for effect in effects if _category_key(effect) == "special")
+    user_input = _user_bracelet_input(memory_hints, fixed_dist, assigned_dist, len(effects), special_effect_count)
     random_slot_dist = {str(user_input["randomOptionSlotCount"]): 1.0} if user_input["randomOptionSlotCount"] is not None else assigned_dist
     leap = (table.get("leapPoints") or {}).get(grade) or {}
     matched = []
@@ -319,7 +339,7 @@ def build_official_bracelet_t4_summary(
             "bindsToRosterAfterPurchase": True,
             "fixedOptionsAreNotUserRngAfterPurchase": True,
             "onlyRandomOptionRerollsShouldBeComparedWithUserAttempts": True,
-            "autoEstimateRule": "총 옵션 3개는 고정 1/랜덤 2, 총 옵션 4개는 고정 2/랜덤 2, 총 옵션 5개는 고정 2/랜덤 3으로 우선 추정합니다. 수동 입력이 있으면 수동 입력을 우선합니다.",
+            "autoEstimateRule": "총 옵션 3개는 고정 1/랜덤 2, 총 옵션 4개는 기본 고정 2/랜덤 2, 총 옵션 5개는 고정 2/랜덤 3으로 우선 추정합니다. 단 특수옵션이 3개면 랜덤 3개 구성으로 우선 추정합니다. 수동 입력이 있으면 수동 입력을 우선합니다.",
             "userInput": user_input,
             "fixedEffectBasis": fixed_effect_basis,
             "randomEffectBasis": random_effect_basis,
@@ -354,8 +374,9 @@ def build_official_bracelet_t4_summary(
         "warning": None if matched else "현재 팔찌 효과를 공식 T4 카테고리와 매칭하지 못했습니다.",
         "limits": [
             "v57부터 팔찌 슬롯 수는 기본 자동 추정합니다. 수동 입력은 자동 추정보다 우선합니다.",
-            "총 옵션 3개는 고정 1개/랜덤 2개로, 총 옵션 4개는 고정 2개/랜덤 2개로, 총 옵션 5개는 고정 2개/랜덤 3개로 우선 추정합니다.",
-            "현재 팔찌 효과 전체 5개를 하나의 랜덤 목표로 계산하지 않습니다.",
+            "총 옵션 3개는 고정 1개/랜덤 2개로, 총 옵션 4개는 기본 고정 2개/랜덤 2개로, 총 옵션 5개는 고정 2개/랜덤 3개로 우선 추정합니다.",
+            "특수옵션이 3개 감지되면 랜덤 3개 구성으로 우선 추정합니다.",
+            "현재 팔찌 효과 전체를 하나의 랜덤 목표로 계산하지 않습니다.",
             "팔찌는 구매 시 고정 옵션과 랜덤 옵션 슬롯이 섞여 있으며, 구매 후 계정 귀속됩니다.",
             "억까 판정에는 사용자가 직접 돌린 랜덤 옵션 시도 수만 기대값과 비교해야 합니다.",
             "옵션 개별 수치 구간별 표기확률은 공식 JSON에 아직 분리되지 않아 카테고리 기준 확률로 표시합니다.",
