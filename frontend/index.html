@@ -17,7 +17,7 @@
         }
         function percent(value) {
           var n = Number(value);
-          if (!Number.isFinite(n)) return '-';
+          if (!Number.isFinite(n)) return '계산 안 함';
           return (n * 100).toFixed(4) + '%';
         }
         function roleLabel(value) {
@@ -36,11 +36,13 @@
             matched: data.matchedEffectCount,
             unmatched: data.unmatchedEffectCount,
             core: data.coreEffectCount,
-            probability: data.combinedCategoryProbability,
+            randomProbability: data.randomOptionBasis && data.randomOptionBasis.weightedSuccessProbability,
             effects: (data.matchedEffects || []).map(function (row) { return [row.rawEffect, row.category, row.matchRole]; })
           });
         }
         function braceletCardHtml(data, signature) {
+          var random = data.randomOptionBasis || {};
+          var purchase = data.purchaseStructure || {};
           var effects = (data.matchedEffects || []).slice(0, 8);
           var limits = data.limits || [];
           var effectHtml = effects.length ? effects.map(function (row) {
@@ -48,19 +50,21 @@
             return '<div class="combo-chip">'
               + '<span>' + escapeHtml(row.rawEffect) + '</span>'
               + '<strong>' + escapeHtml(category) + ' · ' + escapeHtml(roleLabel(row.matchRole)) + '</strong>'
-              + '<small>표기확률 ' + percent(row.categoryDisplayProbability) + '</small>'
+              + '<small>카테고리 표기확률 ' + percent(row.categoryDisplayProbability) + '</small>'
               + '</div>';
           }).join('') : '<p class="hint">공식 카테고리와 매칭된 팔찌 효과가 없습니다.</p>';
           var limitHtml = limits.length ? '<ul>' + limits.map(function (line) { return '<li>' + escapeHtml(line) + '</li>'; }).join('') + '</ul>' : '';
+          var targetCategories = (random.targetCategories || []).join(', ') || '-';
           return '<div class="expected-panel evidence-panel loa-hsi-bracelet-v54" data-loa-hsi-bracelet-v54="true" data-signature="' + escapeHtml(signature) + '">'
             + '<h3>팔찌 T4 공식 매칭</h3>'
-            + '<p class="hint evidence-intro">v54.1 기준 팔찌 공식 매칭은 효과 개수 확률과 기본/전투특성/특수효과 카테고리 확률을 사용합니다.</p>'
+            + '<p class="hint evidence-intro">v55 기준 팔찌는 구매 시 고정 옵션과 랜덤 옵션 슬롯이 섞여 있고, 구매 후 계정 귀속되는 구조로 해석합니다. 현재 효과 전체 5개를 하나의 랜덤 목표로 계산하지 않습니다.</p>'
             + '<div class="evidence-card-grid">'
             + '<section class="evidence-card">'
-            + '<div class="evidence-card-head"><strong>공식 구조</strong><span>' + escapeHtml(data.gradeLabel || '-') + '</span></div>'
+            + '<div class="evidence-card-head"><strong>구매/귀속 구조</strong><span>' + escapeHtml(data.gradeLabel || '-') + '</span></div>'
             + '<div class="evidence-line highlight"><span>도약 포인트</span><strong>' + escapeHtml(data.leapPoints || '-') + 'P</strong></div>'
-            + '<div class="evidence-line"><span>평균 고정 효과</span><strong>' + number(data.expectedFixedEffectCount) + '개</strong></div>'
-            + '<div class="evidence-line"><span>평균 부여 효과</span><strong>' + number(data.expectedAssignedEffectCount) + '개</strong></div>'
+            + '<div class="evidence-line"><span>평균 고정 옵션</span><strong>' + number(data.expectedFixedEffectCount) + '개</strong></div>'
+            + '<div class="evidence-line"><span>평균 랜덤 슬롯</span><strong>' + number(data.expectedAssignedEffectCount) + '개</strong></div>'
+            + '<div class="evidence-line"><span>구매 후 귀속</span><strong>' + (purchase.bindsToRosterAfterPurchase ? '계정 귀속' : '-') + '</strong></div>'
             + '</section>'
             + '<section class="evidence-card">'
             + '<div class="evidence-card-head"><strong>현재 팔찌 매칭</strong><span>' + escapeHtml(data.role === 'support' ? '서포터' : '딜러') + '</span></div>'
@@ -69,12 +73,14 @@
             + '<div class="evidence-line"><span>핵심 효과</span><strong>' + number(data.coreEffectCount, 0) + '개</strong></div>'
             + '</section>'
             + '<section class="evidence-card">'
-            + '<div class="evidence-card-head"><strong>카테고리 기준 난이도</strong><span>공식 카테고리</span></div>'
-            + '<div class="evidence-line highlight"><span>조합 확률</span><strong>' + percent(data.combinedCategoryProbability) + '</strong></div>'
-            + '<div class="evidence-line"><span>기대 시도 수</span><strong>' + number(data.expectedAttemptsCategoryBasis) + '회</strong></div>'
-            + '<div class="evidence-line"><span>부여효과 수 충족</span><strong>' + percent(data.assignedCountProbability) + '</strong></div>'
+            + '<div class="evidence-card-head"><strong>랜덤 옵션 기준</strong><span>직접 돌린 슬롯</span></div>'
+            + '<div class="evidence-line highlight"><span>대상 카테고리</span><strong>' + escapeHtml(targetCategories) + '</strong></div>'
+            + '<div class="evidence-line"><span>1슬롯 카테고리 확률</span><strong>' + percent(random.perRandomSlotCategoryProbability) + '</strong></div>'
+            + '<div class="evidence-line"><span>랜덤 슬롯 기준 성공률</span><strong>' + percent(random.weightedSuccessProbability) + '</strong></div>'
+            + '<div class="evidence-line"><span>기대 시도 수</span><strong>' + number(random.expectedAttempts) + '회</strong></div>'
             + '</section>'
             + '</div>'
+            + '<div class="notice-panel"><strong>전체 효과 확률</strong><p class="hint">' + escapeHtml(data.wholeBraceletEffectReason || '현재 팔찌 전체 효과는 고정 옵션과 랜덤 옵션이 섞일 수 있어 하나의 랜덤 목표로 계산하지 않습니다.') + '</p></div>'
             + '<div class="combo-chip-grid">' + effectHtml + '</div>'
             + '<div class="notice-panel"><strong>계산 제한</strong>' + limitHtml + '</div>'
             + '</div>';
@@ -104,12 +110,12 @@
           var timer = setInterval(function () {
             tries += 1;
             var badge = document.querySelector('.hero .eyebrow');
-            if (badge) badge.textContent = 'LOA-HSI v54.1';
+            if (badge) badge.textContent = 'LOA-HSI v55';
             var list = document.querySelector('.version-history-list');
-            if (list && !list.querySelector('[data-version="v54.1"]')) {
+            if (list && !list.querySelector('[data-version="v55"]')) {
               var item = document.createElement('p');
-              item.dataset.version = 'v54.1';
-              item.innerHTML = '<strong>v54.1</strong> 팔찌 T4 공식 매칭 카드의 반복 렌더링 루프를 차단했습니다.';
+              item.dataset.version = 'v55';
+              item.innerHTML = '<strong>v55</strong> 팔찌 구매/귀속 구조를 반영해 고정 옵션과 랜덤 옵션 기준 기대값을 분리했습니다.';
               list.prepend(item);
             }
             if ((badge && list) || tries >= 20) clearInterval(timer);
