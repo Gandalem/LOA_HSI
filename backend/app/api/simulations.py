@@ -12,7 +12,7 @@ from app.services.expectation_calculator import build_expected_value_summary
 from app.services.class_preset import resolve_class_engraving_preset
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
-MODEL_VERSION = "v48-mobile-report-and-version-sync"
+MODEL_VERSION = "v49-official-probability-foundation"
 
 
 def _points_from_stone_type(value: str | None):
@@ -77,9 +77,10 @@ def compare_character(req: CompareRequest) -> CompareResponse:
     assumptions = [
         "캐릭터 API는 현재 결과물만 보여주며 실제 사용 비용은 알 수 없습니다.",
         "장비 재련은 로컬 T4 재련표와 DB 재료 시세를 기준으로 기본 재료/기본 성공확률만 계산합니다.",
-        "어빌리티 스톤은 표시 활성 레벨을 성공 횟수로 변환한 뒤 목표 확률과 기대 시도 수를 계산합니다.",
-        "장신구/팔찌는 현재 효과와 사용자가 직접 입력한 시도 수만 억까/상쇄 단서에 반영합니다.",
+        "어빌리티 스톤은 API로 가져온 현재 활성 레벨 결과를 목표로 보고, 사용자가 기억한 시도 개수와 비교합니다.",
+        "장신구/팔찌는 공식 확률표 기반 데이터 구조를 준비했으며, 현재 버전에서는 효과 파싱과 기억 입력을 보조 판정에 반영합니다.",
         "장신구 실제 거래가 기반 평가는 아직 별도 기능으로 분리 예정입니다.",
+        "실제 사용 골드를 입력받지 않는 기본 모드에서는 유저 비용 percentile 판정보다 재현 비용 분포와 기억 기반 단서를 우선합니다.",
         f"재료 가격 fingerprint: {engine.material_price_fingerprint[:12]}... · DB 시세 {len(engine.material_price_rows)}개 반영",
     ]
     if cache_hit:
@@ -111,12 +112,32 @@ def compare_character(req: CompareRequest) -> CompareResponse:
     artifact_paths["materialPriceFingerprint"] = engine.material_price_fingerprint
     artifact_paths["materialPriceRows"] = str(len(engine.material_price_rows))
     artifact_paths["modelVersion"] = MODEL_VERSION
+    artifact_paths["actualCostMode"] = "not_provided" if total_actual <= 0 else "provided"
 
     expected_values = build_expected_value_summary(
         character,
         stone_price_gold=float(engine.defaults.get("ability_stone", {}).get("default_stone_price_gold", 5000)),
         class_preset=character.class_engraving_preset,
     )
+    expected_values["actualCostMode"] = artifact_paths["actualCostMode"]
+    expected_values["calculationBasis"] = {
+        "official": [
+            "장신구 효과 확률표 구조",
+            "팔찌 T4 효과 수/카테고리 확률 구조",
+            "스톤 활성 레벨-성공 횟수 변환",
+        ],
+        "estimate": [
+            "장비 재련표 기반 재현 비용",
+            "장신구 실제 거래가 대신 사용하는 임시 시장가 분포",
+            "현재 팔찌 옵션 텍스트 매칭 기반 난이도 보정",
+        ],
+        "memory": [
+            "장기백 기록",
+            "스톤 시도 개수",
+            "장신구 직접 옵션 시도 수",
+            "팔찌 랜덤 옵션 시도 수",
+        ],
+    }
 
     return CompareResponse(
         character=character,
