@@ -15,7 +15,7 @@ from app.services.dataset_writer import DatasetWriter
 from app.services.class_preset import resolve_class_engraving_preset
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
-MODEL_VERSION = "v57-bracelet-auto-slot-estimate"
+MODEL_VERSION = "v58-local-memory-hints"
 
 
 def _points_from_stone_type(value: str | None):
@@ -84,6 +84,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         "장신구 효과는 공식 확률표와 매칭한 뒤 중복 제외 보정 기반 기대 시도 수를 계산합니다.",
         "팔찌 T4는 구매 시 고정 옵션과 랜덤 옵션 슬롯이 섞여 있고 구매 후 계정 귀속되는 구조로 해석합니다.",
         "팔찌 고정/랜덤 슬롯 수는 기본 자동 추정하며, 수동 입력이 있으면 수동 입력을 우선합니다.",
+        "기억 기반 보조 판정은 프론트에서 브라우저 localStorage에만 저장할 수 있으며 서버 DB에는 사용자별 기억 기록으로 저장하지 않습니다.",
         "팔찌 현재 효과 전체를 하나의 랜덤 목표로 계산하지 않고, 직접 돌린 랜덤 옵션 슬롯 기준 기대값만 표시합니다.",
         "v51부터 리포트 생성 시 캐릭터/장비/장신구/팔찌/스톤/기억 입력을 로컬 Parquet 데이터셋으로 저장합니다.",
         "팔찌 옵션 개별 수치 구간별 표기확률은 아직 카테고리 기준 확률과 분리해 표시합니다.",
@@ -157,6 +158,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
             "팔찌 랜덤 옵션 시도 수",
             "팔찌 고정 옵션 수",
             "팔찌 랜덤 슬롯 수",
+            "브라우저 localStorage 저장/불러오기",
         ],
     }
 
