@@ -82,3 +82,11 @@ export function getMaterialPriceAutoStatus() {
 export function getHoningTable() {
   return request('/honing/table');
 }
+
+export function getDatasetStatus() {
+  return request('/dataset/status');
+}
+
+export function getDatasetStats() {
+  return request('/dataset/stats');
+}
