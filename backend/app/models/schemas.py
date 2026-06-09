@@ -79,6 +79,9 @@ class CompareRequest(BaseModel):
     useCachedCharacter: bool = True
     useSupportMaterials: bool = False
     stoneOverride: StoneOverride = Field(default_factory=StoneOverride)
+    # v51: 프론트의 기억 기반 입력을 로컬 데이터셋에 함께 저장합니다.
+    # 계산 API 호환성을 위해 optional dict로 받습니다.
+    memoryHints: dict[str, Any] = Field(default_factory=dict)
 
 
 class PercentileSummary(BaseModel):
