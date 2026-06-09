@@ -24,6 +24,17 @@
           var map = { core: '핵심', secondary: '보조', conditional: '조건부', unmatched: '미분류' };
           return map[value] || value || '-';
         }
+        function basisLabel(value) {
+          var map = {
+            user_input: '사용자 입력',
+            auto_special_count: '자동 추정 · 특수옵션 3개 감지',
+            auto_estimate: '자동 추정',
+            auto_fallback: '자동 보정',
+            partial_user_input_auto_completed: '일부 입력 + 자동 보정',
+            official_distribution: '공식 분포'
+          };
+          return map[value] || value || '-';
+        }
         function escapeHtml(value) {
           return String(value == null ? '' : value).replace(/[&<>"]/g, function (ch) {
             return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch];
@@ -45,9 +56,9 @@
           var row = document.createElement('div');
           row.className = 'accessory-acquisition-row';
           row.dataset.loaHsiBraceletSlotInputs = 'true';
-          row.innerHTML = '<div class="accessory-acquisition-name"><strong>팔찌 구조 입력</strong><small>구매 당시 고정 옵션 수와 직접 돌린 랜덤 슬롯 수</small></div>'
-            + '<select data-loa-hsi-bracelet-fixed-count><option value="">고정 옵션 수 모름</option><option value="1">고정 1개</option><option value="2">고정 2개</option></select>'
-            + '<select data-loa-hsi-bracelet-random-count><option value="">랜덤 슬롯 수 모름</option><option value="1">랜덤 1개</option><option value="2">랜덤 2개</option><option value="3">랜덤 3개</option></select>';
+          row.innerHTML = '<div class="accessory-acquisition-name"><strong>팔찌 구조 입력</strong><small>비워두면 자동 추정합니다. 총 4개 + 특수옵션 3개면 고정 1/랜덤 3으로 추정합니다.</small></div>'
+            + '<select data-loa-hsi-bracelet-fixed-count><option value="">자동 추정 사용</option><option value="1">고정 1개</option><option value="2">고정 2개</option></select>'
+            + '<select data-loa-hsi-bracelet-random-count><option value="">자동 추정 사용</option><option value="1">랜덤 1개</option><option value="2">랜덤 2개</option><option value="3">랜덤 3개</option></select>';
           braceletPanel.appendChild(row);
         }
         function cardSignature(data) {
@@ -66,6 +77,7 @@
           var random = data.randomOptionBasis || {};
           var purchase = data.purchaseStructure || {};
           var userInput = purchase.userInput || {};
+          var inference = userInput.inference || {};
           var fixedBasis = purchase.fixedEffectBasis || {};
           var randomBasis = purchase.randomEffectBasis || {};
           var effects = (data.matchedEffects || []).slice(0, 8);
@@ -80,23 +92,27 @@
           }).join('') : '<p class="hint">공식 카테고리와 매칭된 팔찌 효과가 없습니다.</p>';
           var limitHtml = limits.length ? '<ul>' + limits.map(function (line) { return '<li>' + escapeHtml(line) + '</li>'; }).join('') + '</ul>' : '';
           var targetCategories = (random.targetCategories || []).join(', ') || '-';
-          var fixedLabel = userInput.fixedOptionCount == null ? '모름 · 공식 평균 사용' : '고정 ' + userInput.fixedOptionCount + '개';
-          var randomLabel = userInput.randomOptionSlotCount == null ? '모름 · 공식 분포 사용' : '랜덤 ' + userInput.randomOptionSlotCount + '개';
+          var fixedCount = fixedBasis.effectiveFixedOptionCount ?? userInput.fixedOptionCount;
+          var randomCount = randomBasis.effectiveRandomOptionSlotCount ?? userInput.randomOptionSlotCount;
+          var fixedLabel = fixedCount == null ? '자동 추정 불가' : '고정 ' + fixedCount + '개';
+          var randomLabel = randomCount == null ? '자동 추정 불가' : '랜덤 ' + randomCount + '개';
+          var calcBasis = inference.basis || randomBasis.basis || '-';
+          var calcReason = inference.reason || '-';
           return '<div class="expected-panel evidence-panel loa-hsi-bracelet-v54" data-loa-hsi-bracelet-v54="true" data-signature="' + escapeHtml(signature) + '">'
             + '<h3>팔찌 T4 공식 매칭</h3>'
-            + '<p class="hint evidence-intro">v56 기준 팔찌 구매 당시 고정 옵션 수와 직접 돌린 랜덤 슬롯 수를 입력하면, 해당 슬롯 수 기준으로 기대값을 계산합니다.</p>'
+            + '<p class="hint evidence-intro">v57 기준 팔찌 슬롯 수는 기본 자동 추정합니다. 수동 입력이 있으면 수동 입력을 우선하고, 특수옵션이 3개면 랜덤 3개 구성으로 우선 추정합니다.</p>'
             + '<div class="evidence-card-grid">'
             + '<section class="evidence-card">'
             + '<div class="evidence-card-head"><strong>구매/귀속 구조</strong><span>' + escapeHtml(data.gradeLabel || '-') + '</span></div>'
             + '<div class="evidence-line highlight"><span>고정 옵션 기준</span><strong>' + escapeHtml(fixedLabel) + '</strong></div>'
             + '<div class="evidence-line"><span>랜덤 슬롯 기준</span><strong>' + escapeHtml(randomLabel) + '</strong></div>'
-            + '<div class="evidence-line"><span>구매 후 귀속</span><strong>' + (purchase.bindsToRosterAfterPurchase ? '계정 귀속' : '-') + '</strong></div>'
-            + '<div class="evidence-line"><span>계산 기준</span><strong>' + escapeHtml(randomBasis.basis === 'user_input' ? '사용자 입력' : '공식 분포') + '</strong></div>'
+            + '<div class="evidence-line"><span>계산 기준</span><strong>' + escapeHtml(basisLabel(calcBasis)) + '</strong></div>'
+            + '<div class="evidence-line"><span>추정 사유</span><strong>' + escapeHtml(calcReason) + '</strong></div>'
             + '</section>'
             + '<section class="evidence-card">'
             + '<div class="evidence-card-head"><strong>현재 팔찌 매칭</strong><span>' + escapeHtml(data.role === 'support' ? '서포터' : '딜러') + '</span></div>'
             + '<div class="evidence-line highlight"><span>매칭 성공</span><strong>' + number(data.matchedEffectCount, 0) + '개</strong></div>'
-            + '<div class="evidence-line"><span>미분류</span><strong>' + number(data.unmatchedEffectCount, 0) + '개</strong></div>'
+            + '<div class="evidence-line"><span>특수옵션</span><strong>' + number(inference.specialEffectCount, 0) + '개</strong></div>'
             + '<div class="evidence-line"><span>핵심 효과</span><strong>' + number(data.coreEffectCount, 0) + '개</strong></div>'
             + '</section>'
             + '<section class="evidence-card">'
@@ -107,6 +123,7 @@
             + '<div class="evidence-line"><span>기대 시도 수</span><strong>' + number(random.expectedAttempts) + '회</strong></div>'
             + '</section>'
             + '</div>'
+            + '<div class="notice-panel"><strong>자동 추정 규칙</strong><p class="hint">총 옵션 3개는 고정 1/랜덤 2, 총 옵션 4개는 기본 고정 2/랜덤 2, 총 옵션 5개는 고정 2/랜덤 3으로 봅니다. 단 특수옵션 3개가 감지되면 랜덤 3개 구성으로 우선 추정합니다.</p></div>'
             + '<div class="notice-panel"><strong>전체 효과 확률</strong><p class="hint">' + escapeHtml(data.wholeBraceletEffectReason || '현재 팔찌 전체 효과는 고정 옵션과 랜덤 옵션이 섞일 수 있어 하나의 랜덤 목표로 계산하지 않습니다.') + '</p></div>'
             + '<div class="combo-chip-grid">' + effectHtml + '</div>'
             + '<div class="notice-panel"><strong>계산 제한</strong>' + limitHtml + '</div>'
@@ -137,12 +154,12 @@
           var timer = setInterval(function () {
             tries += 1;
             var badge = document.querySelector('.hero .eyebrow');
-            if (badge) badge.textContent = 'LOA-HSI v56';
+            if (badge) badge.textContent = 'LOA-HSI v57';
             var list = document.querySelector('.version-history-list');
-            if (list && !list.querySelector('[data-version="v56"]')) {
+            if (list && !list.querySelector('[data-version="v57"]')) {
               var item = document.createElement('p');
-              item.dataset.version = 'v56';
-              item.innerHTML = '<strong>v56</strong> 팔찌 구매 당시 고정 옵션 수와 직접 돌린 랜덤 슬롯 수를 명시 입력할 수 있게 했습니다.';
+              item.dataset.version = 'v57';
+              item.innerHTML = '<strong>v57</strong> 팔찌 고정/랜덤 슬롯 수를 자동 추정하고, 특수옵션 3개 감지 시 랜덤 3개 구성으로 보정합니다.';
               list.prepend(item);
             }
             injectBraceletSlotInputs();
