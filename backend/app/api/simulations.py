@@ -12,6 +12,8 @@ from app.services.expectation_calculator import build_expected_value_summary
 from app.services.class_preset import resolve_class_engraving_preset
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
+MODEL_VERSION = "v48-mobile-report-and-version-sync"
+
 
 def _points_from_stone_type(value: str | None):
     if not value:
@@ -21,6 +23,7 @@ def _points_from_stone_type(value: str | None):
         return int(left), int(right)
     except Exception:
         return None
+
 
 def apply_stone_override(character, override):
     if not override or not override.enabled:
@@ -41,7 +44,6 @@ def apply_stone_override(character, override):
         positive_1_name=override.positive1Name or (old.positive_1_name if old else None) or "각인 1",
         positive_1_points=int(p1),
         positive_2_name=override.positive2Name or (old.positive_2_name if old else None) or "각인 2",
-        positive_2_points=int(p2),
         negative_name=override.negativeName or (old.negative_name if old else None) or "감소",
         negative_points=override.negativePoints,
         stone_type=f"{high}/{low}",
@@ -49,6 +51,7 @@ def apply_stone_override(character, override):
         raw_tooltip_excerpt=(old.raw_tooltip_excerpt if old else None),
     )
     return character
+
 
 @router.post("/compare-character", response_model=CompareResponse)
 def compare_character(req: CompareRequest) -> CompareResponse:
@@ -66,23 +69,18 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         selected_modules,
         req.simulationCount,
         req.seed,
-        model_version="v43-ekka-formula-accessory-prob-table",
+        model_version=MODEL_VERSION,
         price_fingerprint=engine.material_price_fingerprint,
     )
     cache_hit = store.exists(cache_key)
 
     assumptions = [
-        "캐릭터 API로 알 수 있는 것은 현재 결과이며, 실제 사용 비용은 알 수 없습니다.",
-        "장비 비용은 Monte Carlo 분포, 스톤 비용은 공식 자동 세공 구조를 DP로 계산한 성공확률 기반 기하분포로 계산합니다.",
-        "장신구/팔찌 확률 기대값은 공식 확률표와 커뮤니티 검증 조합 방식을 로컬 프리셋으로 계산하며, 공식/커뮤니티 페이지를 매번 요청하지 않습니다.",
-        "장비 재련 표는 icepeng/loa-calc의 T4 재련 표 일부를 config/honing_tables_icepeng_t4.json으로 옮겨 사용합니다.",
-        "재료 시세는 거래소 묶음 단가를 BundleCount/priceDivisor 기준으로 1개 단가로 환산해 사용하고, 없는 재료만 기본값을 사용합니다.",
-        "보조재료 최적화/자동 적용은 v27에서 제거했으며, 장비 재련 비용은 기본 재료와 기본 성공확률 기준입니다.",
-        f"재료 가격 기준 fingerprint: {engine.material_price_fingerprint[:12]}...",
-        "시뮬레이션 결과는 DuckDB에 캐시됩니다. 같은 캐릭터/조건/시뮬레이션 수는 재계산하지 않고 DB에서 바로 조회합니다.",
-        "어빌리티 스톤 기대값은 표시 활성 레벨을 성공 횟수 기준으로 변환한 뒤 목표 달성 확률의 역수로 계산합니다.",
-        "원화 환산은 100골드당 원화 입력값을 내부적으로 1골드당 원화로 변환해 계산합니다.",
-        f"현재 DB 재료 시세 {len(engine.material_price_rows)}개를 시뮬레이션에 반영했습니다.",
+        "캐릭터 API는 현재 결과물만 보여주며 실제 사용 비용은 알 수 없습니다.",
+        "장비 재련은 로컬 T4 재련표와 DB 재료 시세를 기준으로 기본 재료/기본 성공확률만 계산합니다.",
+        "어빌리티 스톤은 표시 활성 레벨을 성공 횟수로 변환한 뒤 목표 확률과 기대 시도 수를 계산합니다.",
+        "장신구/팔찌는 현재 효과와 사용자가 직접 입력한 시도 수만 억까/상쇄 단서에 반영합니다.",
+        "장신구 실제 거래가 기반 평가는 아직 별도 기능으로 분리 예정입니다.",
+        f"재료 가격 fingerprint: {engine.material_price_fingerprint[:12]}... · DB 시세 {len(engine.material_price_rows)}개 반영",
     ]
     if cache_hit:
         assumptions.append("이번 결과는 기존 DuckDB 시뮬레이션 캐시를 사용했습니다.")
@@ -97,7 +95,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
             module_values["abilityStone"] = engine.simulate_stone_cost(character, req.simulationCount, req.seed)
         if "accessory" in selected_modules:
             module_values["accessory"] = engine.simulate_accessory_cost(character, req.simulationCount, req.seed)
-        store.save(cache_key, character.character_name, selected_modules, req.simulationCount, req.seed, module_values)
+        store.save(cache_key, character.character_name, selected_modules, req.simulationCount, req.seed, module_values, model_version=MODEL_VERSION)
 
     modules: dict[str, ModuleCompareResult] = {}
     if "equipment" in selected_modules:
@@ -112,6 +110,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
     artifact_paths = store.artifact_paths(cache_key)
     artifact_paths["materialPriceFingerprint"] = engine.material_price_fingerprint
     artifact_paths["materialPriceRows"] = str(len(engine.material_price_rows))
+    artifact_paths["modelVersion"] = MODEL_VERSION
 
     expected_values = build_expected_value_summary(
         character,
