@@ -9,11 +9,12 @@ from app.api.characters import router as characters_router
 from app.api.simulations import router as simulations_router
 from app.api.material_prices import router as material_prices_router
 from app.api.honing import router as honing_router
+from app.api.dataset import router as dataset_router
 from app.models.schemas import HealthResponse
 from app.core.settings import get_settings
 from app.api.material_prices import collect_material_prices, CollectMaterialPricesRequest
 
-app = FastAPI(title="LOA-HSI Character Compare API", version="0.5.0")
+app = FastAPI(title="LOA-HSI Character Compare API", version="0.5.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -95,3 +96,4 @@ app.include_router(characters_router, prefix="/api")
 app.include_router(simulations_router, prefix="/api")
 app.include_router(material_prices_router, prefix="/api")
 app.include_router(honing_router, prefix="/api")
+app.include_router(dataset_router, prefix="/api")
