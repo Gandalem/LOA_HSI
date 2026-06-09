@@ -104,10 +104,6 @@
     grid-template-columns: 1fr;
   }
 
-  .evidence-intro {
-    display: none;
-  }
-
   .evidence-card {
     padding: 13px;
   }
@@ -119,18 +115,5 @@
 
   .evidence-line strong {
     text-align: left;
-  }
-
-  .detail-section .ekka-module-card p {
-    display: none;
-  }
-
-  .detail-section .ekka-module-card li {
-    margin: 4px 0;
-  }
-
-  .detail-section > *:not(summary) {
-    margin-left: 10px;
-    margin-right: 10px;
   }
 }
