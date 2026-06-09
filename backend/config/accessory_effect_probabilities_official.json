@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "version": "v49-official-probability-foundation",
+    "sourceName": "Lost Ark official probability page - 장신구 연마",
+    "sourceUrl": "https://m-lostark.game.onstove.com/Probability/%EC%9E%A5%EC%8B%A0%EA%B5%AC%20%EC%97%B0%EB%A7%88",
+    "notes": [
+      "공식 페이지의 장신구 연마 확률표를 계산 데이터로 분리하기 위한 v49 뼈대입니다.",
+      "이미 부여된 효과는 중복 부여되지 않으며, 실제 확률은 표기확률 / (1 - 제외된 효과의 표기확률 합)으로 보정합니다.",
+      "v49에서는 데이터 구조를 먼저 추가하고, 현재 옵션별 세부 매칭 계산은 다음 버전에서 연결합니다."
+    ]
+  },
+  "gradeProbabilities": {
+    "low": { "label": "하", "probability": 0.063 },
+    "mid": { "label": "중", "probability": 0.03 },
+    "high": { "label": "상", "probability": 0.007 }
+  },
+  "duplicateRule": {
+    "description": "이미 부여된 효과가 다시 등장하지 않도록 제외한 뒤 남은 표기확률 합으로 나누어 실제 확률을 계산합니다.",
+    "formula": "actualProbability = displayProbability / (1 - excludedDisplayProbabilitySum)"
+  },
+  "parts": {
+    "necklace": {
+      "label": "목걸이",
+      "coreDealerOptions": ["추가 피해", "적에게 주는 피해"],
+      "coreSupportOptions": ["세레나데/신앙/조화 게이지 획득량", "낙인력"],
+      "sharedOptions": ["최대 생명력", "공격력", "무기 공격력", "최대 마나", "상태이상 공격 지속시간", "전투 중 생명력 회복량"]
+    },
+    "earring": {
+      "label": "귀걸이",
+      "coreDealerOptions": ["공격력 %", "무기 공격력 %"],
+      "coreSupportOptions": ["파티원 회복 효과", "파티원 보호막 효과"],
+      "sharedOptions": ["최대 생명력", "공격력", "무기 공격력", "최대 마나", "상태이상 공격 지속시간", "전투 중 생명력 회복량"]
+    },
+    "ring": {
+      "label": "반지",
+      "coreDealerOptions": ["치명타 적중률", "치명타 피해"],
+      "coreSupportOptions": ["아군 공격력 강화 효과", "아군 피해량 강화 효과"],
+      "sharedOptions": ["최대 생명력", "공격력", "무기 공격력", "최대 마나", "상태이상 공격 지속시간", "전투 중 생명력 회복량"]
+    }
+  }
+}
