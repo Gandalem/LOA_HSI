@@ -10,12 +10,17 @@ COPY vite.config.js ./vite.config.js
 COPY src ./src
 RUN npm run build \
     && test -f /app/frontend/dist/index.html \
+    && grep -q "id=\"root\"" /app/frontend/dist/index.html \
     && ls -la /app/frontend/dist
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine
+USER root
+RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/default.conf
 COPY --chown=101:101 --from=build /app/frontend/dist/ /usr/share/nginx/html/
 COPY --chown=101:101 nginx.conf /etc/nginx/conf.d/default.conf
 RUN test -f /usr/share/nginx/html/index.html \
+    && grep -q "id=\"root\"" /usr/share/nginx/html/index.html \
+    && nginx -t \
     && ls -la /usr/share/nginx/html \
     && chmod -R a-w /usr/share/nginx/html /etc/nginx/conf.d/default.conf
 USER 101
