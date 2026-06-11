@@ -9,39 +9,12 @@
     <div id="root"></div>
     <script>
       (function () {
-        var lastSignature = '';
         var currentCharacter = null;
         var loadedMemoryKey = '';
         var loadedMemoryHints = null;
         var ignoredMemoryKeys = {};
         var pendingComparePayload = null;
 
-        function number(value, digits) {
-          var n = Number(value);
-          if (!Number.isFinite(n)) return '-';
-          return n.toLocaleString('ko-KR', { maximumFractionDigits: digits == null ? 1 : digits });
-        }
-        function percent(value) {
-          var n = Number(value);
-          if (!Number.isFinite(n)) return '계산 안 함';
-          return (n * 100).toFixed(4) + '%';
-        }
-        function roleLabel(value) {
-          var map = { core: '핵심', secondary: '보조', conditional: '조건부', unmatched: '미분류' };
-          return map[value] || value || '-';
-        }
-        function basisLabel(value) {
-          var map = {
-            user_input: '사용자 입력',
-            auto_special_count: '자동 추정 · 특수옵션 3개 감지',
-            auto_special_count_requires_all_random_special: '특수옵션 3개 랜덤 필요',
-            auto_estimate: '자동 추정',
-            auto_fallback: '자동 보정',
-            partial_user_input_auto_completed: '일부 입력 + 자동 보정',
-            official_distribution: '공식 분포'
-          };
-          return map[value] || value || '-';
-        }
         function escapeHtml(value) {
           return String(value == null ? '' : value).replace(/[&<>"]/g, function (ch) {
             return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch];
@@ -58,11 +31,6 @@
         }
         function memoryKeyFor(characterName, serverName) {
           return 'loa-hsi:memory:v1:' + encodeURIComponent(serverName || 'unknown') + ':' + encodeURIComponent(characterName || 'unknown');
-        }
-        function currentMemoryKey(payloadCharacterName) {
-          var name = payloadCharacterName || characterNameOf(currentCharacter);
-          var server = serverNameOf(currentCharacter);
-          return memoryKeyFor(name, server);
         }
         function formatSavedAt(value) {
           if (!value) return '-';
@@ -286,95 +254,6 @@
           braceletPanel.appendChild(row);
           if (loadedMemoryHints) applyBraceletSlotInputsFromMemory(loadedMemoryHints);
         }
-        function cardSignature(data) {
-          if (!data) return '';
-          return JSON.stringify({
-            version: data.version,
-            matched: data.matchedEffectCount,
-            unmatched: data.unmatchedEffectCount,
-            core: data.coreEffectCount,
-            randomProbability: data.randomOptionBasis && data.randomOptionBasis.weightedSuccessProbability,
-            user: data.purchaseStructure && data.purchaseStructure.userInput,
-            effects: (data.matchedEffects || []).map(function (row) { return [row.rawEffect, row.category, row.matchRole]; })
-          });
-        }
-        function braceletCardHtml(data, signature) {
-          var random = data.randomOptionBasis || {};
-          var purchase = data.purchaseStructure || {};
-          var userInput = purchase.userInput || {};
-          var inference = userInput.inference || {};
-          var fixedBasis = purchase.fixedEffectBasis || {};
-          var randomBasis = purchase.randomEffectBasis || {};
-          var effects = (data.matchedEffects || []).slice(0, 8);
-          var limits = data.limits || [];
-          var effectHtml = effects.length ? effects.map(function (row) {
-            var category = row.categoryLabel || row.category || '-';
-            return '<div class="combo-chip">'
-              + '<span>' + escapeHtml(row.rawEffect) + '</span>'
-              + '<strong>' + escapeHtml(category) + ' · ' + escapeHtml(roleLabel(row.matchRole)) + '</strong>'
-              + '<small>카테고리 표기확률 ' + percent(row.categoryDisplayProbability) + '</small>'
-              + '</div>';
-          }).join('') : '<p class="hint">공식 카테고리와 매칭된 팔찌 효과가 없습니다.</p>';
-          var limitHtml = limits.length ? '<ul>' + limits.map(function (line) { return '<li>' + escapeHtml(line) + '</li>'; }).join('') + '</ul>' : '';
-          var targetCategories = (random.targetCategories || []).join(', ') || '-';
-          var required = random.requiredRandomCategoryCounts || {};
-          var requiredLabel = Object.keys(required).length ? Object.keys(required).map(function (key) { return key + ' ' + required[key] + '개'; }).join(', ') : '-';
-          var fixedCount = fixedBasis.effectiveFixedOptionCount ?? userInput.fixedOptionCount;
-          var randomCount = randomBasis.effectiveRandomOptionSlotCount ?? userInput.randomOptionSlotCount;
-          var fixedLabel = fixedCount == null ? '자동 추정 불가' : '고정 ' + fixedCount + '개';
-          var randomLabel = randomCount == null ? '자동 추정 불가' : '랜덤 ' + randomCount + '개';
-          var calcBasis = inference.basis || random.requirementBasis || randomBasis.basis || '-';
-          var calcReason = inference.reason || '-';
-          return '<div class="expected-panel evidence-panel loa-hsi-bracelet-v54" data-loa-hsi-bracelet-v54="true" data-signature="' + escapeHtml(signature) + '">'
-            + '<h3>팔찌 T4 공식 매칭</h3>'
-            + '<p class="hint evidence-intro">v60.1 기준 팔찌 슬롯 수는 기본 자동 추정합니다. 특수옵션이 3개면 랜덤 3개 구성으로 우선 추정하고, 기대값은 필요한 카테고리 개수 기준으로 계산합니다.</p>'
-            + '<div class="evidence-card-grid">'
-            + '<section class="evidence-card">'
-            + '<div class="evidence-card-head"><strong>구매/귀속 구조</strong><span>' + escapeHtml(data.gradeLabel || '-') + '</span></div>'
-            + '<div class="evidence-line highlight"><span>고정 옵션 기준</span><strong>' + escapeHtml(fixedLabel) + '</strong></div>'
-            + '<div class="evidence-line"><span>랜덤 슬롯 기준</span><strong>' + escapeHtml(randomLabel) + '</strong></div>'
-            + '<div class="evidence-line"><span>계산 기준</span><strong>' + escapeHtml(basisLabel(calcBasis)) + '</strong></div>'
-            + '<div class="evidence-line"><span>추정 사유</span><strong>' + escapeHtml(calcReason) + '</strong></div>'
-            + '</section>'
-            + '<section class="evidence-card">'
-            + '<div class="evidence-card-head"><strong>현재 팔찌 매칭</strong><span>' + escapeHtml(data.role === 'support' ? '서포터' : '딜러') + '</span></div>'
-            + '<div class="evidence-line highlight"><span>매칭 성공</span><strong>' + number(data.matchedEffectCount, 0) + '개</strong></div>'
-            + '<div class="evidence-line"><span>특수옵션</span><strong>' + number(inference.specialEffectCount, 0) + '개</strong></div>'
-            + '<div class="evidence-line"><span>핵심 효과</span><strong>' + number(data.coreEffectCount, 0) + '개</strong></div>'
-            + '</section>'
-            + '<section class="evidence-card">'
-            + '<div class="evidence-card-head"><strong>랜덤 옵션 기준</strong><span>직접 돌린 슬롯</span></div>'
-            + '<div class="evidence-line highlight"><span>필요 카테고리</span><strong>' + escapeHtml(requiredLabel) + '</strong></div>'
-            + '<div class="evidence-line"><span>대상 카테고리</span><strong>' + escapeHtml(targetCategories) + '</strong></div>'
-            + '<div class="evidence-line"><span>랜덤 슬롯 기준 성공률</span><strong>' + percent(random.weightedSuccessProbability) + '</strong></div>'
-            + '<div class="evidence-line"><span>기대 시도 수</span><strong>' + number(random.expectedAttempts) + '회</strong></div>'
-            + '</section>'
-            + '</div>'
-            + '<div class="notice-panel"><strong>전체 효과 확률</strong><p class="hint">' + escapeHtml(data.wholeBraceletEffectReason || '현재 팔찌 전체 효과는 고정 옵션과 랜덤 옵션이 섞일 수 있어 하나의 랜덤 목표로 계산하지 않습니다.') + '</p></div>'
-            + '<div class="combo-chip-grid">' + effectHtml + '</div>'
-            + '<div class="notice-panel"><strong>계산 제한</strong>' + limitHtml + '</div>'
-            + '</div>';
-        }
-        function renderBraceletCard(data) {
-          if (!data) return;
-          var signature = cardSignature(data);
-          if (!signature || signature === lastSignature) return;
-          var attempts = 0;
-          var timer = setInterval(function () {
-            attempts += 1;
-            var host = document.querySelector('.expected-panel.evidence-panel');
-            if (!host && attempts < 20) return;
-            clearInterval(timer);
-            if (!host) return;
-            var old = document.querySelector('[data-loa-hsi-bracelet-v54="true"]');
-            if (old && old.dataset.signature === signature) return;
-            var wrap = document.createElement('div');
-            wrap.innerHTML = braceletCardHtml(data, signature);
-            if (old) old.replaceWith(wrap.firstElementChild);
-            else host.insertAdjacentElement('afterend', wrap.firstElementChild);
-            lastSignature = signature;
-          }, 100);
-        }
         function patchStaticLabels() {
           var tries = 0;
           var timer = setInterval(function () {
@@ -424,7 +303,6 @@
             if (String(url).indexOf('/simulations/compare-character') >= 0) {
               response.clone().json().then(function (data) {
                 if (data && data.character) setCurrentCharacter(data.character);
-                renderBraceletCard(data && data.expectedValues && data.expectedValues.officialBraceletT4);
                 if (response.ok && (comparePayloadForSave || pendingComparePayload)) {
                   saveMemoryRecord(comparePayloadForSave || pendingComparePayload, data && data.character ? data.character : currentCharacter);
                 }
