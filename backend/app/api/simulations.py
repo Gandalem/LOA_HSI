@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from fastapi import APIRouter
 
@@ -27,6 +29,48 @@ def _points_from_stone_type(value: str | None):
         return int(left), int(right)
     except Exception:
         return None
+
+
+def _attempts_for_at_least_once(probability: float | None, target: float) -> float | None:
+    if not probability or probability <= 0 or probability >= 1:
+        return None
+    return math.log(1.0 - target) / math.log(1.0 - probability)
+
+
+def sync_legacy_bracelet_summary(expected_values: dict, official_bracelet: dict | None) -> None:
+    """Keep old React fields aligned with the v60.1 official bracelet model.
+
+    ResultPanel.jsx still reads expectedValues.braceletT4 in several places. Until that
+    component is fully migrated, copy the official v60.1 random-option expectation into
+    the legacy keys so the visible score and detail text do not use the old 1+ category
+    probability model.
+    """
+    if not official_bracelet:
+        return
+    random_basis = official_bracelet.get("randomOptionBasis") or {}
+    probability = random_basis.get("weightedSuccessProbability")
+    expected_attempts = random_basis.get("expectedAttempts")
+    if probability is None or expected_attempts is None:
+        return
+
+    legacy = expected_values.setdefault("braceletT4", {})
+    legacy["version"] = "v60.1-legacy-synced-from-officialBraceletT4"
+    legacy["targetProbabilityOneOrMoreValidSpecial"] = probability
+    legacy["expectedAttemptsForValidSpecial"] = expected_attempts
+    legacy["attemptsForAtLeastOnce"] = {
+        "50%": _attempts_for_at_least_once(probability, 0.50),
+        "90%": _attempts_for_at_least_once(probability, 0.90),
+        "99%": _attempts_for_at_least_once(probability, 0.99),
+    }
+    legacy["byAssignedCount"] = random_basis.get("successProbabilityByAssignedCount") or {}
+    legacy["randomOptionBasis"] = random_basis
+    legacy["currentValidEffects"] = [row.get("rawEffect") for row in official_bracelet.get("targetEffects") or [] if row.get("rawEffect")]
+    legacy["currentValidLikeEffects"] = legacy["currentValidEffects"]
+    legacy["currentSecondaryEffects"] = []
+    legacy["currentConditionalEffects"] = []
+    legacy["currentNonCoreEffects"] = [row.get("rawEffect") for row in official_bracelet.get("unmatchedEffects") or [] if row.get("rawEffect")]
+    legacy["formula"] = random_basis.get("formula") or "v60.1 공식 팔찌 랜덤 옵션 기대값을 사용합니다."
+    legacy["rule"] = "v60.1부터 기존 braceletT4 표시값도 officialBraceletT4.randomOptionBasis 기준으로 동기화합니다."
 
 
 def apply_stone_override(character, override):
@@ -89,6 +133,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         "팔찌 고정/랜덤 슬롯 수는 기본 자동 추정하며, 수동 입력이 있으면 수동 입력을 우선합니다.",
         "기억 기반 보조 판정은 프론트에서 브라우저 localStorage에만 저장할 수 있으며 서버 DB에는 사용자별 기억 기록으로 저장하지 않습니다.",
         "팔찌 현재 효과 전체를 하나의 랜덤 목표로 계산하지 않고, 직접 돌린 랜덤 옵션 슬롯 기준 기대값만 표시합니다.",
+        "v60.1부터 기존 프론트 braceletT4 표시값도 officialBraceletT4의 필요 카테고리 개수 기준 기대값과 동기화합니다.",
         "v51부터 리포트 생성 시 캐릭터/장비/장신구/팔찌/스톤/기억 입력을 로컬 Parquet 데이터셋으로 저장합니다.",
         "팔찌 옵션 개별 수치 구간별 표기확률은 아직 카테고리 기준 확률과 분리해 표시합니다.",
         "실제 사용 골드를 입력받지 않는 기본 모드에서는 유저 비용 percentile 판정보다 재현 비용 분포와 기억 기반 단서를 우선합니다.",
@@ -139,6 +184,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         class_preset=character.class_engraving_preset,
         memory_hints=req.memoryHints,
     )
+    sync_legacy_bracelet_summary(expected_values, expected_values.get("officialBraceletT4"))
     expected_values["marketCost"] = build_market_cost_summary(
         character,
         expected_values.get("officialAccessoryEffects"),
