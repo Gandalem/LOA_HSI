@@ -11,7 +11,7 @@ import duckdb
 import pandas as pd
 
 from app.core.settings import get_settings
-from app.models.schemas import CharacterSummary, EquipmentItem
+from app.models.schemas import CharacterSummary
 
 
 DATASET_TABLES = [
@@ -53,8 +53,10 @@ def _safe_int(value: Any) -> int | None:
 class DatasetWriter:
     """Persist report-time character snapshots into local Parquet + DuckDB views.
 
-    Docker maps the host project data directory to /app/data, so files written here
-    appear on Windows under D:\\LOA-HSI\\data when the default compose file is used.
+    v58.2: the dataset keeps one latest snapshot per server_name + character_name.
+    Before writing a new report snapshot, old Parquet files for the same character are
+    removed from every dataset table. This keeps the dashboard from counting the same
+    character repeatedly just because the report was regenerated.
     """
 
     def __init__(self) -> None:
@@ -80,6 +82,7 @@ class DatasetWriter:
             "date_key": date_key,
             "model_version": model_version,
         }
+        overwritten = self._overwrite_existing_character(character)
         table_rows = {
             "character_snapshots": self._character_rows(character, expected_values, memory_hints, context),
             "equipment_items": self._equipment_rows(character, context),
@@ -103,6 +106,7 @@ class DatasetWriter:
             "date": date_key,
             "writtenTables": written,
             "rowCounts": counts,
+            "overwrite": overwritten,
             "views": views,
         }
 
@@ -129,7 +133,7 @@ class DatasetWriter:
         }
 
     def stats(self) -> dict[str, Any]:
-        """Return compact dataset statistics for the v52 dashboard card."""
+        """Return compact dataset statistics for the dashboard card."""
         status = self.status()
         summary = {
             "totalSizeBytes": status["totalSizeBytes"],
@@ -232,6 +236,72 @@ class DatasetWriter:
         out_path = out_dir / f"{snapshot_id}.parquet"
         pd.DataFrame(rows).to_parquet(out_path, index=False)
         return out_path
+
+    def _overwrite_existing_character(self, character: CharacterSummary) -> dict[str, Any]:
+        snapshot_ids = self._existing_snapshot_ids_for_character(character)
+        deleted_by_table = {table: 0 for table in DATASET_TABLES}
+        if not snapshot_ids:
+            return {
+                "mode": "latest_per_character",
+                "identity": self._character_identity(character),
+                "deletedSnapshotIds": [],
+                "deletedFilesByTable": deleted_by_table,
+            }
+        for table in DATASET_TABLES:
+            table_dir = self.parquet_root / table
+            if not table_dir.exists():
+                continue
+            for snapshot_id in snapshot_ids:
+                for path in table_dir.glob(f"**/{snapshot_id}.parquet"):
+                    try:
+                        path.unlink()
+                        deleted_by_table[table] += 1
+                    except FileNotFoundError:
+                        pass
+            self._remove_empty_dirs(table_dir)
+        return {
+            "mode": "latest_per_character",
+            "identity": self._character_identity(character),
+            "deletedSnapshotIds": snapshot_ids,
+            "deletedFilesByTable": deleted_by_table,
+        }
+
+    def _existing_snapshot_ids_for_character(self, character: CharacterSummary) -> list[str]:
+        if not self._has_parquet("character_snapshots"):
+            return []
+        identity = self._character_identity(character)
+        pattern = self._duckdb_glob("character_snapshots")
+        try:
+            with duckdb.connect(str(self.db_path)) as con:
+                rows = con.execute(
+                    f"""
+                    SELECT DISTINCT snapshot_id
+                    FROM read_parquet('{pattern}', union_by_name=true)
+                    WHERE character_name = ?
+                      AND COALESCE(server_name, '') = ?
+                    """,
+                    [identity["characterName"], identity["serverName"]],
+                ).fetchall()
+                return [str(row[0]) for row in rows if row and row[0]]
+        except Exception:
+            return []
+
+    def _character_identity(self, character: CharacterSummary) -> dict[str, str]:
+        return {
+            "characterName": str(character.character_name or ""),
+            "serverName": str(character.server_name or ""),
+        }
+
+    def _remove_empty_dirs(self, root: Path) -> None:
+        if not root.exists():
+            return
+        dirs = sorted((path for path in root.glob("**/*") if path.is_dir()), key=lambda p: len(p.parts), reverse=True)
+        for path in dirs:
+            try:
+                if not any(path.iterdir()):
+                    path.rmdir()
+            except OSError:
+                pass
 
     def _has_parquet(self, table: str) -> bool:
         table_dir = self.parquet_root / table
