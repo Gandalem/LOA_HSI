@@ -61,6 +61,79 @@ function App() {
     });
   }, [character]);
 
+  useEffect(() => {
+    function valueOrEmpty(value) {
+      return value === null || value === undefined ? '' : String(value);
+    }
+
+    function normalizePityRecords(records) {
+      const current = Array.isArray(records) && records.length
+        ? records
+        : [{ part: 'unknown', target: 'unknown' }];
+
+      return current.map((record) => {
+        const part = record?.part || 'unknown';
+        const target = record?.target || 'unknown';
+        const allowedTargets = targetOptionsForPart(part);
+
+        return {
+          part,
+          target: target === 'unknown' || allowedTargets.includes(target) ? target : 'unknown'
+        };
+      });
+    }
+
+    function normalizeAccessoryAcquisitions(acquisitions, sourceCharacter) {
+      const source = acquisitions && typeof acquisitions === 'object' ? acquisitions : {};
+      const rows = accessoryRows(sourceCharacter || character);
+      const normalizeEntry = (entry) => ({
+        mode: ['unknown', 'purchased', 'polished'].includes(entry?.mode) ? entry.mode : 'unknown',
+        attempts: valueOrEmpty(entry?.attempts)
+      });
+
+      if (!rows.length) {
+        return Object.fromEntries(
+          Object.entries(source).map(([key, entry]) => [key, normalizeEntry(entry)])
+        );
+      }
+
+      const next = {};
+      rows.forEach((row) => {
+        next[row.key] = normalizeEntry(source[row.key]);
+      });
+      return next;
+    }
+
+    function normalizeBraceletAcquisition(bracelet) {
+      const source = bracelet && typeof bracelet === 'object' ? bracelet : {};
+
+      return {
+        mode: ['unknown', 'base_purchased', 'self_obtained'].includes(source.mode) ? source.mode : 'unknown',
+        attempts: valueOrEmpty(source.attempts),
+        fixedOptionCount: valueOrEmpty(source.fixedOptionCount),
+        randomOptionSlotCount: valueOrEmpty(source.randomOptionSlotCount)
+      };
+    }
+
+    function handleLoadMemoryHints(event) {
+      const loaded = event.detail?.memoryHints;
+      const sourceCharacter = event.detail?.character || character;
+      if (!loaded || typeof loaded !== 'object') return;
+
+      setMemoryHints((prev) => ({
+        ...prev,
+        ...loaded,
+        pityRecords: normalizePityRecords(loaded.pityRecords),
+        stoneAttempts: valueOrEmpty(loaded.stoneAttempts),
+        accessoryAcquisitions: normalizeAccessoryAcquisitions(loaded.accessoryAcquisitions, sourceCharacter),
+        braceletAcquisition: normalizeBraceletAcquisition(loaded.braceletAcquisition)
+      }));
+    }
+
+    window.addEventListener('loa-hsi-load-memory-hints', handleLoadMemoryHints);
+    return () => window.removeEventListener('loa-hsi-load-memory-hints', handleLoadMemoryHints);
+  }, [character]);
+
   async function loadHoningTable() {
     setHoningTableLoading(true);
     setError('');
