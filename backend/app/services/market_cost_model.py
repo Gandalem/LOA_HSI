@@ -67,23 +67,25 @@ def _quality_mult(q: int | None) -> float:
     if q is None:
         return 1.0
     if q >= 80:
-        return min(2.2, 1.0 + (q - 80) * 0.018)
-    return max(0.55, 1.0 - (80 - q) * 0.006)
+        return min(1.12, 1.0 + (q - 80) * 0.005)
+    return max(0.75, 1.0 - (80 - q) * 0.004)
 
 
 def _accessory_item(item: EquipmentItem, official: dict[str, Any] | None) -> dict[str, Any]:
     part = str((official or {}).get("part") or _part(item.slot))
-    base = {"necklace": 180000.0, "earring": 90000.0, "ring": 85000.0}.get(part, 70000.0)
+    # v60.1 calibration: observed listings for the same T4 ancient necklace can be around 18k-25k gold.
+    # Until real auction/trade search is connected, synthetic prices must stay close to that scale.
+    base = {"necklace": 11000.0, "earring": 8000.0, "ring": 8000.0}.get(part, 7000.0)
     targets = (official or {}).get("targetEffects") or []
     matched = (official or {}).get("matchedEffects") or []
     core = sum(1 for row in targets if row.get("isCore"))
     secondary = sum(1 for row in targets if row.get("isSecondary"))
     high = sum(1 for row in targets if int(row.get("gradeRank") or 0) >= 3)
     mid = sum(1 for row in targets if int(row.get("gradeRank") or 0) == 2)
-    mult = 1.0 + core * 1.65 + secondary * 0.45 + high * 0.55 + mid * 0.20
+    mult = 1.0 + core * 0.42 + secondary * 0.08 + high * 0.13 + mid * 0.04
     if not targets and not matched:
         mult *= 0.75
-    median = base * _quality_mult(item.quality) * max(0.3, mult)
+    median = base * _quality_mult(item.quality) * max(0.5, mult)
     samples = max(5, 80 - core * 12 - high * 10 - (10 if item.quality and item.quality >= 90 else 0))
     return {
         "slot": item.slot,
@@ -98,12 +100,12 @@ def _accessory_item(item: EquipmentItem, official: dict[str, Any] | None) -> dic
         "secondaryEffectCount": secondary,
         "matchedEffectCount": len(matched),
         "similarListingEstimate": {
-            "minGold": _gold(median * 0.55),
-            "q25Gold": _gold(median * 0.78),
+            "minGold": _gold(median * 0.80),
+            "q25Gold": _gold(median * 0.92),
             "medianGold": _gold(median),
-            "q75Gold": _gold(median * 1.38),
+            "q75Gold": _gold(median * 1.18),
             "sampleCount": samples,
-            "sampleType": "synthetic_comparable_until_trade_api",
+            "sampleType": "observed_scale_synthetic_until_trade_api",
         },
         "matchingConditions": {
             "part": _part_label(part),
@@ -113,8 +115,8 @@ def _accessory_item(item: EquipmentItem, official: dict[str, Any] | None) -> dic
             "coreEffectCount": core,
             "validEffectCount": len(targets),
         },
-        "basis": "heuristic_market_reproduction_v1",
-        "warning": "실제 유사 매물 조회 전까지는 품질과 유효옵션 수 기반 추정값입니다.",
+        "basis": "observed_scale_market_reproduction_v1_1",
+        "warning": "실제 유사 매물 조회 전까지는 사용자가 확인한 매물 가격대에 맞춘 임시 추정값입니다.",
     }
 
 
@@ -131,12 +133,14 @@ def _bracelet(character: CharacterSummary, official: dict[str, Any] | None, memo
     if not item:
         return {"available": False, "reason": "조회된 팔찌가 없습니다."}
     grade = _bracelet_grade(item)
-    base_price = {"ancient": 200000.0, "relic": 60000.0}.get(grade, 200000.0)
-    reroll_price = {"ancient": 14000.0, "relic": 7000.0}.get(grade, 14000.0)
+    base_price = {"ancient": 30000.0, "relic": 10000.0}.get(grade, 30000.0)
+    reroll_price = {"ancient": 200.0, "relic": 100.0}.get(grade, 200.0)
     hint = (memory or {}).get("braceletAcquisition") or {}
+    mode = hint.get("mode") or "unknown"
     attempts = _i(hint.get("attempts"))
     expected_attempts = _n(((official or {}).get("randomOptionBasis") or {}).get("expectedAttempts"), 0.0) or None
-    actual = base_price + reroll_price * attempts if attempts is not None else None
+    actual_base = 0.0 if mode == "self_obtained" else base_price
+    actual = actual_base + reroll_price * attempts if attempts is not None else None
     expected = base_price + reroll_price * expected_attempts if expected_attempts is not None else None
     return {
         "available": True,
@@ -144,16 +148,17 @@ def _bracelet(character: CharacterSummary, official: dict[str, Any] | None, memo
         "grade": grade,
         "gradeLabel": (official or {}).get("gradeLabel") or ("유물" if grade == "relic" else "고대"),
         "baseBraceletPriceGold": _gold(base_price),
+        "actualBaseCostAppliedGold": _gold(actual_base) if attempts is not None else None,
         "rerollStonePriceGold": _gold(reroll_price),
         "userAttempts": attempts,
-        "userMode": hint.get("mode") or "unknown",
+        "userMode": mode,
         "estimatedActualCostGold": _gold(actual),
         "expectedAttempts": expected_attempts,
         "expectedRerollCostGold": _gold(reroll_price * expected_attempts) if expected_attempts is not None else None,
         "expectedReproductionCostGold": _gold(expected),
-        "formula": "베이스 팔찌 가격 + 팔찌 돌 가격 × 시도 수",
-        "basis": "base_plus_reroll_stone_model_v1",
-        "warning": "팔찌 가격은 v60 기본값입니다. 실제 가격 조회 연동 후 교체해야 합니다.",
+        "formula": "기억 기반 비용 = 적용 베이스 비용 + 팔찌 돌 가격 × 시도 수. 직접 획득 팔찌는 베이스 비용을 0G로 봅니다.",
+        "basis": "observed_scale_base_plus_reroll_stone_model_v1_1",
+        "warning": "팔찌 가격은 v60.1 임시 기본값입니다. 실제 가격 조회 연동 후 교체해야 합니다.",
     }
 
 
@@ -171,8 +176,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     bracelet = _bracelet(character, official_bracelet, memory_hints)
     bracelet_cost = bracelet.get("estimatedActualCostGold") or bracelet.get("expectedReproductionCostGold") or 0
     return {
-        "version": "v60-market-cost-model",
-        "source": "heuristic_until_trade_or_auction_api",
+        "version": "v60.1-market-cost-calibrated",
+        "source": "observed_scale_heuristic_until_trade_or_auction_api",
         "tradeApiConnected": False,
         "summary": {
             "accessoryMedianGold": total["medianGold"],
@@ -184,7 +189,7 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
             "items": items,
             "total": total,
             "conditions": ["부위", "등급", "티어", "품질 구간", "핵심 옵션 수", "유효 옵션 수"],
-            "basis": "현재 장신구와 비슷한 조건의 시장 재현 비용 추정",
+            "basis": "사용자가 확인한 매물 가격대에 맞춘 보수적 시장 재현 비용 추정",
         },
         "braceletMarket": bracelet,
         "separationRule": {
@@ -192,9 +197,10 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
             "luck": "운 판정은 장기백, 스톤 시도 수, 장신구 직접 연마 시도 수, 팔찌 랜덤 옵션 시도 수로 따로 봅니다.",
         },
         "limits": [
-            "v60 1차는 실제 유사 매물 조회가 아니라 조건 기반 시장가 추정 모델입니다.",
-            "장신구는 부위/품질/유효옵션 수를 이용해 하위 25%, 중앙값, 상위 25%를 추정합니다.",
-            "팔찌는 베이스 팔찌 가격과 팔찌 돌 가격 × 시도 수를 분리합니다.",
+            "v60.1은 실제 유사 매물 조회가 아니라 사용자가 확인한 매물 가격대에 맞춘 임시 추정 모델입니다.",
+            "장신구는 부위/품질/유효옵션 수를 이용하되, 실제 매물 조회 전까지 과대평가를 피하도록 낮게 보정합니다.",
+            "직접 획득한 팔찌는 기억 기반 실제 비용에서 베이스 팔찌 가격을 0G로 봅니다.",
+            "팔찌 돌 가격은 실제 API 연동 전 임시값입니다.",
             "운 판정과 시장 구매 비용은 한 점수로 섞지 않습니다.",
         ],
     }
