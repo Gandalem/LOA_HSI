@@ -10,7 +10,6 @@
     <script>
       (function () {
         var lastSignature = '';
-        var lastMarketSignature = '';
         var currentCharacter = null;
         var loadedMemoryKey = '';
         var loadedMemoryHints = null;
@@ -21,11 +20,6 @@
           var n = Number(value);
           if (!Number.isFinite(n)) return '-';
           return n.toLocaleString('ko-KR', { maximumFractionDigits: digits == null ? 1 : digits });
-        }
-        function gold(value) {
-          var n = Number(value);
-          if (!Number.isFinite(n)) return '-';
-          return n.toLocaleString('ko-KR', { maximumFractionDigits: 0 }) + 'G';
         }
         function percent(value) {
           var n = Number(value);
@@ -381,83 +375,6 @@
             lastSignature = signature;
           }, 100);
         }
-        function marketSignature(data) {
-          if (!data) return '';
-          return JSON.stringify({
-            version: data.version,
-            summary: data.summary,
-            accessoryTotal: data.accessoryMarket && data.accessoryMarket.total,
-            bracelet: data.braceletMarket,
-            items: ((data.accessoryMarket && data.accessoryMarket.items) || []).map(function (row) {
-              var est = row.similarListingEstimate || {};
-              return [row.slot, row.name, row.qualityBand, est.medianGold];
-            })
-          });
-        }
-        function marketCostCardHtml(data, signature) {
-          var summary = data.summary || {};
-          var accessory = data.accessoryMarket || {};
-          var total = accessory.total || {};
-          var bracelet = data.braceletMarket || {};
-          var items = accessory.items || [];
-          var limits = data.limits || [];
-          var itemHtml = items.length ? items.map(function (row) {
-            var est = row.similarListingEstimate || {};
-            return '<div class="combo-chip">'
-              + '<span>' + escapeHtml(row.partLabel || row.slot || '장신구') + ' · 품질 ' + escapeHtml(row.quality == null ? '-' : row.quality) + '</span>'
-              + '<strong>' + gold(est.medianGold) + '</strong>'
-              + '<small>' + gold(est.minGold) + ' ~ ' + gold(est.q75Gold) + ' · ' + escapeHtml(row.qualityBand || '-') + '</small>'
-              + '</div>';
-          }).join('') : '<p class="hint">장신구 시장가 추정 항목이 없습니다.</p>';
-          var limitHtml = limits.length ? '<ul>' + limits.map(function (line) { return '<li>' + escapeHtml(line) + '</li>'; }).join('') + '</ul>' : '';
-          return '<div class="expected-panel evidence-panel loa-hsi-market-v601" data-loa-hsi-market-v601="true" data-signature="' + escapeHtml(signature) + '">'
-            + '<h3>v60.1 시장 재현 비용</h3>'
-            + '<p class="hint evidence-intro">장신구/팔찌 구매 비용은 운 판정과 분리해 표시합니다. 현재 값은 실제 거래소 조회 전 단계의 임시 시장가 추정입니다.</p>'
-            + '<div class="evidence-card-grid">'
-            + '<section class="evidence-card">'
-            + '<div class="evidence-card-head"><strong>시장 재현 합계</strong><span>' + escapeHtml(data.tradeApiConnected ? '실매물 연동' : '임시 추정') + '</span></div>'
-            + '<div class="evidence-line highlight"><span>합계</span><strong>' + gold(summary.marketReproductionGold) + '</strong></div>'
-            + '<div class="evidence-line"><span>장신구 중앙값</span><strong>' + gold(summary.accessoryMedianGold) + '</strong></div>'
-            + '<div class="evidence-line"><span>팔찌 기억 기반</span><strong>' + gold(summary.braceletActualGold) + '</strong></div>'
-            + '</section>'
-            + '<section class="evidence-card">'
-            + '<div class="evidence-card-head"><strong>장신구 시장가</strong><span>' + number(total.itemCount, 0) + '개</span></div>'
-            + '<div class="evidence-line highlight"><span>중앙값 합계</span><strong>' + gold(total.medianGold) + '</strong></div>'
-            + '<div class="evidence-line"><span>하위 25%</span><strong>' + gold(total.q25Gold) + '</strong></div>'
-            + '<div class="evidence-line"><span>상위 25%</span><strong>' + gold(total.q75Gold) + '</strong></div>'
-            + '</section>'
-            + '<section class="evidence-card">'
-            + '<div class="evidence-card-head"><strong>팔찌 비용</strong><span>' + escapeHtml(bracelet.gradeLabel || '-') + '</span></div>'
-            + '<div class="evidence-line highlight"><span>입력 시도 수</span><strong>' + number(bracelet.userAttempts, 0) + '회</strong></div>'
-            + '<div class="evidence-line"><span>팔찌 돌 1회</span><strong>' + gold(bracelet.rerollStonePriceGold) + '</strong></div>'
-            + '<div class="evidence-line"><span>기대 기준 비용</span><strong>' + gold(bracelet.expectedReproductionCostGold) + '</strong></div>'
-            + '</section>'
-            + '</div>'
-            + '<div class="combo-chip-grid">' + itemHtml + '</div>'
-            + '<div class="notice-panel"><strong>비용/운 분리</strong><p class="hint">구형 장신구 시뮬레이션 비용은 연마 확률 기반 참고값이고, 실제 구매 재현 비용은 이 시장가 카드의 값을 우선합니다.</p></div>'
-            + '<div class="notice-panel"><strong>계산 제한</strong>' + limitHtml + '</div>'
-            + '</div>';
-        }
-        function renderMarketCostCard(data) {
-          if (!data) return;
-          var signature = marketSignature(data);
-          if (!signature || signature === lastMarketSignature) return;
-          var attempts = 0;
-          var timer = setInterval(function () {
-            attempts += 1;
-            var host = document.querySelector('[data-loa-hsi-bracelet-v54="true"]') || document.querySelector('.expected-panel.evidence-panel');
-            if (!host && attempts < 20) return;
-            clearInterval(timer);
-            if (!host) return;
-            var old = document.querySelector('[data-loa-hsi-market-v601="true"]');
-            if (old && old.dataset.signature === signature) return;
-            var wrap = document.createElement('div');
-            wrap.innerHTML = marketCostCardHtml(data, signature);
-            if (old) old.replaceWith(wrap.firstElementChild);
-            else host.insertAdjacentElement('afterend', wrap.firstElementChild);
-            lastMarketSignature = signature;
-          }, 100);
-        }
         function patchStaticLabels() {
           var tries = 0;
           var timer = setInterval(function () {
@@ -508,7 +425,6 @@
               response.clone().json().then(function (data) {
                 if (data && data.character) setCurrentCharacter(data.character);
                 renderBraceletCard(data && data.expectedValues && data.expectedValues.officialBraceletT4);
-                renderMarketCostCard(data && data.expectedValues && data.expectedValues.marketCost);
                 if (response.ok && (comparePayloadForSave || pendingComparePayload)) {
                   saveMemoryRecord(comparePayloadForSave || pendingComparePayload, data && data.character ? data.character : currentCharacter);
                 }
