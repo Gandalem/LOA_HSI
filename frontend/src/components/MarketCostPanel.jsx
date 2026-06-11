@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 function gold(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
@@ -44,9 +45,7 @@ function AccessoryMarketChip({ item }) {
   );
 }
 
-export default function MarketCostPanel({ marketCost }) {
-  if (!marketCost) return null;
-
+function MarketCostCard({ marketCost }) {
   const summary = marketCost.summary || {};
   const accessory = marketCost.accessoryMarket || {};
   const total = accessory.total || {};
@@ -118,4 +117,46 @@ export default function MarketCostPanel({ marketCost }) {
       )}
     </div>
   );
+}
+
+export default function MarketCostPanel({ marketCost }) {
+  const [portalHost, setPortalHost] = useState(null);
+
+  useEffect(() => {
+    if (!marketCost) {
+      setPortalHost(null);
+      return undefined;
+    }
+
+    var cancelled = false;
+    var timer = null;
+    var attempts = 0;
+
+    function ensureHost() {
+      if (cancelled) return;
+      attempts += 1;
+      var details = document.querySelector('.detail-section');
+      if (!details) {
+        if (attempts < 30) timer = window.setTimeout(ensureHost, 100);
+        return;
+      }
+      var host = details.querySelector('[data-loa-hsi-market-v601-portal="true"]');
+      if (!host) {
+        host = document.createElement('div');
+        host.dataset.loaHsiMarketV601Portal = 'true';
+        details.appendChild(host);
+      }
+      setPortalHost(host);
+    }
+
+    ensureHost();
+
+    return function cleanup() {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [marketCost]);
+
+  if (!marketCost || !portalHost) return null;
+  return createPortal(<MarketCostCard marketCost={marketCost} />, portalHost);
 }
