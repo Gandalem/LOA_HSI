@@ -10,6 +10,20 @@ function number(value, digits = 1) {
   return Number(value).toLocaleString('ko-KR', { maximumFractionDigits: digits });
 }
 
+function marketSignature(marketCost) {
+  if (!marketCost) return '';
+  return JSON.stringify({
+    version: marketCost.version,
+    summary: marketCost.summary,
+    accessoryTotal: marketCost.accessoryMarket && marketCost.accessoryMarket.total,
+    bracelet: marketCost.braceletMarket,
+    items: ((marketCost.accessoryMarket && marketCost.accessoryMarket.items) || []).map((row) => {
+      const estimate = row.similarListingEstimate || {};
+      return [row.slot, row.name, row.qualityBand, estimate.medianGold];
+    })
+  });
+}
+
 function MarketStatLine({ label, value, highlight = false }) {
   return (
     <div className={highlight ? 'evidence-line highlight' : 'evidence-line'}>
@@ -39,9 +53,15 @@ export default function MarketCostPanel({ marketCost }) {
   const bracelet = marketCost.braceletMarket || {};
   const items = accessory.items || [];
   const limits = marketCost.limits || [];
+  const signature = marketSignature(marketCost);
 
   return (
-    <div className="expected-panel evidence-panel loa-hsi-market-v601-react" data-loa-hsi-market-v601-react="true">
+    <div
+      className="expected-panel evidence-panel loa-hsi-market-v601-react"
+      data-loa-hsi-market-v601="true"
+      data-loa-hsi-market-v601-react="true"
+      data-signature={signature}
+    >
       <h3>v60.1 시장 재현 비용</h3>
       <p className="hint evidence-intro">
         장신구/팔찌 구매 비용은 운 판정과 분리해 표시합니다. 현재 값은 실제 거래소 조회 전 단계의 임시 시장가 추정입니다.
