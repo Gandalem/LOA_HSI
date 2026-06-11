@@ -381,7 +381,7 @@ function App() {
     <main className="container">
       <header className="hero ekka-hero">
         <div>
-          <p className="eyebrow">LOA-HSI v51</p>
+          <p className="eyebrow">LOA-HSI v59</p>
           <h1>내가 접을 만했나? 로스트아크 성장 억까 리포트</h1>
           <p className="hero-copy">핵심 결론만 먼저 보여주고, 자세한 계산은 필요할 때 펼쳐보는 리포트입니다.</p>
         </div>
@@ -481,7 +481,7 @@ function App() {
 
           <div className="form-grid memory-grid numeric-memory-grid v36-memory-grid">
             <label>스톤 시도 개수<span><input type="number" min="0" step="1" value={memoryHints.stoneAttempts} onChange={(e) => setMemory('stoneAttempts', e.target.value)} placeholder="예: 120" /> 개</span><small>입력값이 매우 크면 “입력값이 사실이라면 극단적 억까”로 해석합니다.</small></label>
-            <label>시뮬레이션 수<span><select value={simulationCount} onChange={(e) => setSimulationCount(e.target.value)}><option value="10000">1만 명</option><option value="100000">10만 명</option><option value="300000">30만 명</option></select></span></label>
+            <label>가상 성장 샘플 수<span><select value={simulationCount} onChange={(e) => setSimulationCount(e.target.value)}><option value="10000">1만 회 가상 성장</option><option value="100000">10만 회 가상 성장</option><option value="300000">30만 회 가상 성장</option></select></span><small>실제 유저 수가 아니라 현재 캐릭터 목표 스펙까지 도달하는 가상 성장 비용 샘플 수입니다.</small></label>
             <label>100골드 원화 환산<span><input type="number" step="1" value={krwPer100Gold} onChange={(e) => setKrwPer100Gold(e.target.value)} /> 원</span></label>
           </div>
 
@@ -555,6 +555,7 @@ function App() {
         <details className="notice-panel footer-notice-panel">
           <summary>공지사항 / 업데이트 내역</summary>
           <div className="notice-list version-history-list">
+            <p><strong>v59</strong> 시뮬레이션 수 표현을 “명”에서 “회 가상 성장”으로 바꾸고, 실제 유저 데이터가 아니라 가상 성장 샘플이라는 점을 명확히 했습니다.</p>
             <p><strong>v51</strong> 리포트 생성 시 캐릭터/장비/장신구/팔찌/스톤/기억 입력을 로컬 Parquet 데이터셋으로 저장하고, /api/dataset/status로 상태를 확인할 수 있게 했습니다.</p>
             <p><strong>v50</strong> 장신구 현재 옵션을 공식 확률표와 직접 매칭하고, 중복 제외 보정 기반 기대 시도 수를 백엔드 응답에 추가했습니다.</p>
             <p><strong>v49</strong> 공식 장신구/팔찌 확률표 데이터 구조를 정리하고, 실제 비용 미입력 시 percentile 판정을 숨기도록 보완했습니다.</p>
