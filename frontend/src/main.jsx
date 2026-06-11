@@ -4,6 +4,7 @@ import { collectMaterialPrices, compareCharacter, getCharacterSummary, ensureMat
 import CharacterPanel from './components/CharacterPanel.jsx';
 import ResultPanel from './components/ResultPanel.jsx';
 import HoningTablePanel from './components/HoningTablePanel.jsx';
+import BraceletSlotStructureSelector, { normalizeBraceletSlotStructure } from './components/BraceletSlotStructureSelector.jsx';
 import './styles/app.css';
 
 function App() {
@@ -25,7 +26,7 @@ function App() {
     pityRecords: [{ part: 'unknown', target: 'unknown' }],
     stoneAttempts: '',
     accessoryAcquisitions: {},
-    braceletAcquisition: { mode: 'unknown', attempts: '' }
+    braceletAcquisition: { mode: 'unknown', attempts: '', fixedOptionCount: '', randomOptionSlotCount: '' }
   });
 
   useEffect(() => {
@@ -53,8 +54,10 @@ function App() {
       });
       const acqChanged = JSON.stringify(currentAcq) !== JSON.stringify(nextAcq);
       const hasBracelet = (character?.accessories || []).some((item) => item.slot === '팔찌');
-      const currentBracelet = prev.braceletAcquisition || { mode: 'unknown', attempts: '' };
-      const nextBracelet = hasBracelet ? currentBracelet : { mode: 'unknown', attempts: '' };
+      const currentBracelet = prev.braceletAcquisition || { mode: 'unknown', attempts: '', fixedOptionCount: '', randomOptionSlotCount: '' };
+      const nextBracelet = hasBracelet
+        ? normalizeBraceletAcquisition(currentBracelet, character)
+        : { mode: 'unknown', attempts: '', fixedOptionCount: '', randomOptionSlotCount: '' };
       const braceletChanged = JSON.stringify(currentBracelet) !== JSON.stringify(nextBracelet);
       if (changed || acqChanged || braceletChanged) return { ...prev, pityRecords: next, accessoryAcquisitions: nextAcq, braceletAcquisition: nextBracelet };
       return prev;
@@ -104,17 +107,6 @@ function App() {
       return next;
     }
 
-    function normalizeBraceletAcquisition(bracelet) {
-      const source = bracelet && typeof bracelet === 'object' ? bracelet : {};
-
-      return {
-        mode: ['unknown', 'base_purchased', 'self_obtained'].includes(source.mode) ? source.mode : 'unknown',
-        attempts: valueOrEmpty(source.attempts),
-        fixedOptionCount: valueOrEmpty(source.fixedOptionCount),
-        randomOptionSlotCount: valueOrEmpty(source.randomOptionSlotCount)
-      };
-    }
-
     function handleLoadMemoryHints(event) {
       const loaded = event.detail?.memoryHints;
       const sourceCharacter = event.detail?.character || character;
@@ -126,7 +118,7 @@ function App() {
         pityRecords: normalizePityRecords(loaded.pityRecords),
         stoneAttempts: valueOrEmpty(loaded.stoneAttempts),
         accessoryAcquisitions: normalizeAccessoryAcquisitions(loaded.accessoryAcquisitions, sourceCharacter),
-        braceletAcquisition: normalizeBraceletAcquisition(loaded.braceletAcquisition)
+        braceletAcquisition: normalizeBraceletAcquisition(loaded.braceletAcquisition, sourceCharacter)
       }));
     }
 
@@ -230,6 +222,18 @@ function App() {
     }
   }
 
+  function normalizeBraceletAcquisition(source, sourceCharacter = character) {
+    const current = source && typeof source === 'object' ? source : {};
+    const braceletItem = braceletRow(sourceCharacter);
+    const structure = normalizeBraceletSlotStructure(current, braceletItem);
+    return {
+      mode: ['unknown', 'base_purchased', 'self_obtained'].includes(current.mode) ? current.mode : 'unknown',
+      attempts: current.attempts === null || current.attempts === undefined ? '' : String(current.attempts),
+      fixedOptionCount: structure.fixedOptionCount,
+      randomOptionSlotCount: structure.randomOptionSlotCount
+    };
+  }
+
   async function runReport() {
     if (!characterName.trim()) {
       setError('먼저 캐릭터명을 입력하세요.');
@@ -239,6 +243,10 @@ function App() {
     setError('');
     try {
       const selected = Object.entries(modules).filter(([, v]) => v).map(([k]) => k);
+      const sanitizedMemoryHints = {
+        ...memoryHints,
+        braceletAcquisition: normalizeBraceletAcquisition(memoryHints.braceletAcquisition)
+      };
       const data = await compareCharacter({
         characterName: characterName.trim(),
         compareModules: selected,
@@ -249,7 +257,7 @@ function App() {
           abilityStone: 0,
           accessory: 0
         },
-        memoryHints,
+        memoryHints: sanitizedMemoryHints,
         simulationCount: Number(simulationCount),
         krwPer100Gold: Number(krwPer100Gold),
         seed: 42,
@@ -257,6 +265,7 @@ function App() {
       });
       setCharacter(data.character);
       setResult(data);
+      setMemoryHints((prev) => ({ ...prev, braceletAcquisition: sanitizedMemoryHints.braceletAcquisition }));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -360,11 +369,22 @@ function App() {
 
   function updateBraceletAcquisition(field, value) {
     setMemoryHints((prev) => {
-      const before = prev.braceletAcquisition || { mode: 'unknown', attempts: '' };
+      const before = prev.braceletAcquisition || { mode: 'unknown', attempts: '', fixedOptionCount: '', randomOptionSlotCount: '' };
       const next = field === 'mode' && !['base_purchased', 'self_obtained'].includes(value)
-        ? { ...before, [field]: value, attempts: '' }
+        ? { ...before, [field]: value, attempts: '', fixedOptionCount: '', randomOptionSlotCount: '' }
         : { ...before, [field]: value };
-      return { ...prev, braceletAcquisition: next };
+      return { ...prev, braceletAcquisition: normalizeBraceletAcquisition(next) };
+    });
+  }
+
+  function updateBraceletStructure(value) {
+    setMemoryHints((prev) => {
+      const before = prev.braceletAcquisition || { mode: 'unknown', attempts: '', fixedOptionCount: '', randomOptionSlotCount: '' };
+      const [fixedOptionCount = '', randomOptionSlotCount = ''] = value ? value.split(':') : ['', ''];
+      return {
+        ...prev,
+        braceletAcquisition: normalizeBraceletAcquisition({ ...before, fixedOptionCount, randomOptionSlotCount })
+      };
     });
   }
 
@@ -523,23 +543,31 @@ function App() {
               <p className="hint">팔찌는 완성품 구매가 아니라 베이스 팔찌를 산 뒤 랜덤 옵션을 직접 돌리는 구조로 봅니다. 직접 돌린 경우에만 시도 수를 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>
             </div>
             {braceletRow() ? (
-              <div className="accessory-acquisition-row">
-                <div className="accessory-acquisition-name">
-                  <strong>팔찌</strong>
-                  <small>{braceletRow()?.name || '팔찌'} · {braceletRow()?.grade || '-'}</small>
+              <>
+                <div className="accessory-acquisition-row">
+                  <div className="accessory-acquisition-name">
+                    <strong>팔찌</strong>
+                    <small>{braceletRow()?.name || '팔찌'} · {braceletRow()?.grade || '-'}</small>
+                  </div>
+                  <select disabled={!modules.accessory} value={memoryHints.braceletAcquisition?.mode || 'unknown'} onChange={(e) => updateBraceletAcquisition('mode', e.target.value)}>
+                    <option value="unknown">기억 안 남</option>
+                    <option value="base_purchased">베이스 팔찌 구매 후 직접 돌림</option>
+                    <option value="self_obtained">직접 획득한 팔찌를 돌림</option>
+                  </select>
+                  {['base_purchased', 'self_obtained'].includes(memoryHints.braceletAcquisition?.mode) && (
+                    <label className="inline-attempt-input">
+                      <input type="number" min="0" step="1" disabled={!modules.accessory} value={memoryHints.braceletAcquisition?.attempts || ''} onChange={(e) => updateBraceletAcquisition('attempts', e.target.value)} placeholder="시도 수" />
+                      <span>개</span>
+                    </label>
+                  )}
                 </div>
-                <select disabled={!modules.accessory} value={memoryHints.braceletAcquisition?.mode || 'unknown'} onChange={(e) => updateBraceletAcquisition('mode', e.target.value)}>
-                  <option value="unknown">기억 안 남</option>
-                  <option value="base_purchased">베이스 팔찌 구매 후 직접 돌림</option>
-                  <option value="self_obtained">직접 획득한 팔찌를 돌림</option>
-                </select>
-                {['base_purchased', 'self_obtained'].includes(memoryHints.braceletAcquisition?.mode) && (
-                  <label className="inline-attempt-input">
-                    <input type="number" min="0" step="1" disabled={!modules.accessory} value={memoryHints.braceletAcquisition?.attempts || ''} onChange={(e) => updateBraceletAcquisition('attempts', e.target.value)} placeholder="시도 수" />
-                    <span>개</span>
-                  </label>
-                )}
-              </div>
+                <BraceletSlotStructureSelector
+                  item={braceletRow()}
+                  disabled={!modules.accessory}
+                  value={memoryHints.braceletAcquisition || {}}
+                  onChange={updateBraceletStructure}
+                />
+              </>
             ) : (
               <p className="hint">조회된 팔찌가 없습니다.</p>
             )}
@@ -555,6 +583,7 @@ function App() {
         <details className="notice-panel footer-notice-panel">
           <summary>공지사항 / 업데이트 내역</summary>
           <div className="notice-list version-history-list">
+            <p><strong>v60.2</strong> 팔찌 구조 입력을 React로 옮기고, 현재 팔찌 옵션 개수와 맞지 않는 고정/랜덤 조합은 선택하지 못하게 했습니다.</p>
             <p><strong>v59</strong> 시뮬레이션 수 표현을 “명”에서 “회 가상 성장”으로 바꾸고, 실제 유저 데이터가 아니라 가상 성장 샘플이라는 점을 명확히 했습니다.</p>
             <p><strong>v51</strong> 리포트 생성 시 캐릭터/장비/장신구/팔찌/스톤/기억 입력을 로컬 Parquet 데이터셋으로 저장하고, /api/dataset/status로 상태를 확인할 수 있게 했습니다.</p>
             <p><strong>v50</strong> 장신구 현재 옵션을 공식 확률표와 직접 매칭하고, 중복 제외 보정 기반 기대 시도 수를 백엔드 응답에 추가했습니다.</p>
