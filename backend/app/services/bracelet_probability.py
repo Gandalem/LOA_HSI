@@ -126,15 +126,19 @@ def _attempts_from_probability(prob: float | None) -> float | None:
     return 1.0 / prob
 
 
+def _category_probability(category: str) -> float:
+    row = (_official_table().get("categoryProbabilities") or {}).get(category) or {}
+    return float(row.get("probability") or 0.0)
+
+
 def _category_probability_sum(categories: list[str]) -> float | None:
-    category_probs = _official_table().get("categoryProbabilities") or {}
     unique = []
     for category in categories:
-        if category in category_probs and category not in unique:
+        if _category_probability(category) > 0 and category not in unique:
             unique.append(category)
     if not unique:
         return None
-    return sum(float(category_probs[category].get("probability") or 0.0) for category in unique)
+    return sum(_category_probability(category) for category in unique)
 
 
 def _weighted_at_least_one_by_assigned_count(base_prob: float | None, assigned_dist: dict[str, float]) -> tuple[float | None, dict[str, float]]:
@@ -148,6 +152,105 @@ def _weighted_at_least_one_by_assigned_count(base_prob: float | None, assigned_d
         by_count[count_text] = p
         total += float(count_prob) * p
     return total, by_count
+
+
+def _factorial(value: int) -> int:
+    result = 1
+    for n in range(2, value + 1):
+        result *= n
+    return result
+
+
+def _category_count_probability(required_counts: dict[str, int], slot_count: int) -> float | None:
+    required_counts = {key: int(value) for key, value in required_counts.items() if int(value) > 0}
+    if not required_counts:
+        return None
+    if slot_count < sum(required_counts.values()):
+        return 0.0
+    categories = list(required_counts.keys())
+    probabilities = {category: _category_probability(category) for category in categories}
+    if any(probabilities[category] <= 0 for category in categories):
+        return None
+    other_probability = max(0.0, 1.0 - sum(probabilities.values()))
+    total = 0.0
+
+    def walk(index: int, remaining: int, counts: dict[str, int]) -> None:
+        nonlocal total
+        if index == len(categories):
+            other_count = remaining
+            coefficient = _factorial(slot_count) / _factorial(other_count)
+            probability = other_probability ** other_count
+            for category, count in counts.items():
+                coefficient /= _factorial(count)
+                probability *= probabilities[category] ** count
+            total += coefficient * probability
+            return
+        category = categories[index]
+        minimum = required_counts[category]
+        for count in range(minimum, remaining + 1):
+            counts[category] = count
+            walk(index + 1, remaining - count, counts)
+        counts.pop(category, None)
+
+    walk(0, slot_count, {})
+    return total
+
+
+def _weighted_required_categories_by_assigned_count(required_counts: dict[str, int], assigned_dist: dict[str, float]) -> tuple[float | None, dict[str, float]]:
+    if not required_counts or not assigned_dist:
+        return None, {}
+    by_count: dict[str, float] = {}
+    total = 0.0
+    for count_text, count_prob in assigned_dist.items():
+        count = int(count_text)
+        p = _category_count_probability(required_counts, count)
+        if p is None:
+            return None, {}
+        by_count[count_text] = p
+        total += float(count_prob) * p
+    return total, by_count
+
+
+def _target_category_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        category = str(row.get("category") or "")
+        if category:
+            counts[category] = counts.get(category, 0) + 1
+    return counts
+
+
+def _required_random_category_counts(
+    target_rows: list[dict[str, Any]],
+    fixed_count: int | None,
+    random_count: int | None,
+    inference_basis: str | None,
+) -> dict[str, Any]:
+    visible_counts = _target_category_counts(target_rows)
+    fixed_count = int(fixed_count or 0)
+    random_count = int(random_count or 0)
+    if not visible_counts or random_count <= 0:
+        return {"visible": visible_counts, "assumedFixed": {}, "requiredRandom": {}, "basis": "no_random_target"}
+
+    if inference_basis == "auto_special_count" and visible_counts.get("special", 0) >= random_count:
+        required = {"special": random_count}
+        assumed = dict(visible_counts)
+        assumed["special"] = max(0, assumed.get("special", 0) - random_count)
+        assumed = {key: value for key, value in assumed.items() if value > 0}
+        return {"visible": visible_counts, "assumedFixed": assumed, "requiredRandom": required, "basis": "auto_special_count_requires_all_random_special"}
+
+    assumed: dict[str, int] = {}
+    remaining = dict(visible_counts)
+    fixed_left = fixed_count
+    for category in sorted(remaining.keys(), key=lambda key: (_category_probability(key), remaining[key]), reverse=True):
+        if fixed_left <= 0:
+            break
+        used = min(remaining[category], fixed_left)
+        assumed[category] = used
+        remaining[category] -= used
+        fixed_left -= used
+    required = {key: value for key, value in remaining.items() if value > 0}
+    return {"visible": visible_counts, "assumedFixed": assumed, "requiredRandom": required, "basis": "visible_target_minus_assumed_fixed"}
 
 
 def _infer_bracelet_counts(
@@ -298,10 +401,17 @@ def build_official_bracelet_t4_summary(
         })
     target = [row for row in matched if row["matchRole"] in {"core", "secondary", "conditional"}]
     core = [row for row in matched if row["matchRole"] == "core"]
-    target_categories = [row["category"] for row in (core or target)]
-    per_random_slot_category_probability = _category_probability_sum(target_categories)
-    random_option_success_probability, by_assigned_count = _weighted_at_least_one_by_assigned_count(
-        per_random_slot_category_probability,
+    target_rows = core or target
+    target_categories = [row["category"] for row in target_rows]
+    random_requirement = _required_random_category_counts(
+        target_rows,
+        user_input["fixedOptionCount"],
+        user_input["randomOptionSlotCount"],
+        user_input["inference"].get("basis"),
+    )
+    per_random_slot_category_probability = _category_probability_sum(list((random_requirement.get("requiredRandom") or {}).keys()))
+    random_option_success_probability, by_assigned_count = _weighted_required_categories_by_assigned_count(
+        random_requirement.get("requiredRandom") or {},
         random_slot_dist,
     )
     fixed_effect_basis = {
@@ -320,7 +430,7 @@ def build_official_bracelet_t4_summary(
         "note": "랜덤 슬롯 수는 자동 추정값 또는 사용자가 명시한 값 기준으로 기대값을 계산합니다.",
     }
     return {
-        "version": "v57-bracelet-auto-slot-estimate",
+        "version": "v60.1-bracelet-random-category-counts",
         "role": role,
         "source": (table.get("metadata") or {}).get("sourceUrl"),
         "grade": grade,
@@ -343,11 +453,11 @@ def build_official_bracelet_t4_summary(
             "userInput": user_input,
             "fixedEffectBasis": fixed_effect_basis,
             "randomEffectBasis": random_effect_basis,
-            "description": "팔찌는 구매 시 고정 옵션과 랜덤 옵션 슬롯이 섞여 있으며, 구매 후 계정 귀속됩니다. 따라서 현재 효과 전체를 한 번에 직접 뽑은 목표로 계산하지 않습니다.",
+            "description": "팔찌는 구매 시 고정 옵션과 랜덤 옵션 슬롯이 섞여 있으며, 구매 후 계정 귀속됩니다. 따라서 현재 효과 전체를 하나의 랜덤 목표로 계산하지 않습니다.",
         },
         "matchedEffects": matched,
         "unmatchedEffects": unmatched,
-        "targetEffects": core or target,
+        "targetEffects": target_rows,
         "matchedEffectCount": len(matched),
         "unmatchedEffectCount": len(unmatched),
         "coreEffectCount": len(core),
@@ -356,6 +466,10 @@ def build_official_bracelet_t4_summary(
         "wholeBraceletEffectReason": "현재 팔찌 효과에는 구매 당시 고정 옵션과 구매 후 직접 돌린 랜덤 옵션이 섞일 수 있어 전체 효과를 하나의 랜덤 목표로 계산하지 않습니다.",
         "randomOptionBasis": {
             "targetCategories": list(dict.fromkeys(target_categories)),
+            "visibleTargetCategoryCounts": random_requirement.get("visible") or {},
+            "assumedFixedCategoryCounts": random_requirement.get("assumedFixed") or {},
+            "requiredRandomCategoryCounts": random_requirement.get("requiredRandom") or {},
+            "requirementBasis": random_requirement.get("basis"),
             "perRandomSlotCategoryProbability": per_random_slot_category_probability,
             "successProbabilityByAssignedCount": by_assigned_count,
             "weightedSuccessProbability": random_option_success_probability,
@@ -364,16 +478,16 @@ def build_official_bracelet_t4_summary(
             "userRandomOptionSlotCount": user_input["explicitRandomOptionSlotCount"],
             "effectiveRandomOptionSlotCount": user_input["randomOptionSlotCount"],
             "usedSlotDistribution": random_slot_dist,
-            "formula": "랜덤 옵션 기준 확률 = Σ P(랜덤 슬롯 수=n) × [1-(1-p)^n]. p는 핵심/유효 카테고리 중 하나가 한 슬롯에 붙을 카테고리 기준 확률입니다.",
+            "formula": "랜덤 옵션 기준 확률 = 랜덤 슬롯에 필요한 카테고리 개수가 모두 충족될 확률입니다. 예: 랜덤 3슬롯 모두 특수효과가 필요하면 0.3^3으로 계산합니다.",
             "interpretation": "사용자가 팔찌를 직접 돌린 시도 수를 입력했을 때 비교할 기준입니다. 구매 당시 이미 붙어 있던 고정 옵션은 억까 판정 대상으로 보지 않습니다.",
         },
-        "targetCategorySequenceProbability": None,
+        "targetCategorySequenceProbability": random_option_success_probability,
         "assignedCountProbability": random_option_success_probability,
         "combinedCategoryProbability": random_option_success_probability,
         "expectedAttemptsCategoryBasis": _attempts_from_probability(random_option_success_probability),
         "warning": None if matched else "현재 팔찌 효과를 공식 T4 카테고리와 매칭하지 못했습니다.",
         "limits": [
-            "v57부터 팔찌 슬롯 수는 기본 자동 추정합니다. 수동 입력은 자동 추정보다 우선합니다.",
+            "v60.1부터 팔찌 랜덤 옵션 기대값은 카테고리 하나 이상이 아니라 필요한 카테고리 개수 기준으로 계산합니다.",
             "총 옵션 3개는 고정 1개/랜덤 2개로, 총 옵션 4개는 기본 고정 2개/랜덤 2개로, 총 옵션 5개는 고정 2개/랜덤 3개로 우선 추정합니다.",
             "특수옵션이 3개 감지되면 랜덤 3개 구성으로 우선 추정합니다.",
             "현재 팔찌 효과 전체를 하나의 랜덤 목표로 계산하지 않습니다.",
@@ -381,5 +495,5 @@ def build_official_bracelet_t4_summary(
             "억까 판정에는 사용자가 직접 돌린 랜덤 옵션 시도 수만 기대값과 비교해야 합니다.",
             "옵션 개별 수치 구간별 표기확률은 공식 JSON에 아직 분리되지 않아 카테고리 기준 확률로 표시합니다.",
         ],
-        "formula": "전체 효과 확률은 계산하지 않음. 자동 추정 또는 사용자가 명시한 랜덤 슬롯 수 기준으로 기대값만 계산합니다.",
+        "formula": "전체 효과 확률은 계산하지 않음. 자동 추정 또는 사용자가 명시한 랜덤 슬롯 수 기준으로 필요한 카테고리 개수 충족 확률만 계산합니다.",
     }
