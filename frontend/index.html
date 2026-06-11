@@ -65,13 +65,6 @@
             return (panel.textContent || '').indexOf(text) >= 0;
           });
         }
-        function applyBraceletSlotInputsFromMemory(memoryHints) {
-          var bracelet = (memoryHints && memoryHints.braceletAcquisition) || {};
-          var fixed = document.querySelector('[data-loa-hsi-bracelet-fixed-count]');
-          var random = document.querySelector('[data-loa-hsi-bracelet-random-count]');
-          if (fixed && bracelet.fixedOptionCount != null) setNativeValue(fixed, bracelet.fixedOptionCount || '');
-          if (random && bracelet.randomOptionSlotCount != null) setNativeValue(random, bracelet.randomOptionSlotCount || '');
-        }
         function applyPityRecordsFromMemory(records) {
           var rowsData = Array.isArray(records) && records.length ? records : [{ part: 'unknown', target: 'unknown' }];
           var panel = panelByText('.pity-record-panel', '장기백 기록');
@@ -133,8 +126,6 @@
           if (stone && hints.stoneAttempts != null) setNativeValue(stone, hints.stoneAttempts || '');
           applyAccessoryAcquisitionsFromMemory(hints.accessoryAcquisitions || {});
           applyBraceletAcquisitionFromMemory(hints.braceletAcquisition || {});
-          applyBraceletSlotInputsFromMemory(hints);
-          setTimeout(function () { applyBraceletSlotInputsFromMemory(hints); }, 120);
         }
         function saveMemoryRecord(payload, character) {
           if (!payload || !payload.memoryHints) return;
@@ -228,46 +219,22 @@
           if (!character || !characterNameOf(character)) return;
           currentCharacter = character;
           setTimeout(function () {
-            injectBraceletSlotInputs();
             renderMemoryPanel(currentCharacter);
           }, 200);
-        }
-        function readBraceletSlotInputs() {
-          var fixed = document.querySelector('[data-loa-hsi-bracelet-fixed-count]');
-          var random = document.querySelector('[data-loa-hsi-bracelet-random-count]');
-          return {
-            fixedOptionCount: fixed && fixed.value ? fixed.value : '',
-            randomOptionSlotCount: random && random.value ? random.value : ''
-          };
-        }
-        function injectBraceletSlotInputs() {
-          if (document.querySelector('[data-loa-hsi-bracelet-slot-inputs="true"]')) return;
-          var panels = Array.from(document.querySelectorAll('.accessory-acquisition-panel'));
-          var braceletPanel = panels.find(function (panel) { return (panel.textContent || '').indexOf('팔찌 랜덤 옵션 시도') >= 0; });
-          if (!braceletPanel || (braceletPanel.textContent || '').indexOf('조회된 팔찌가 없습니다') >= 0) return;
-          var row = document.createElement('div');
-          row.className = 'accessory-acquisition-row';
-          row.dataset.loaHsiBraceletSlotInputs = 'true';
-          row.innerHTML = '<div class="accessory-acquisition-name"><strong>팔찌 구조 입력</strong><small>비워두면 자동 추정합니다. 특수옵션이 3개면 랜덤 3개 구성으로 우선 추정합니다.</small></div>'
-            + '<select data-loa-hsi-bracelet-fixed-count><option value="">자동 추정 사용</option><option value="1">고정 1개</option><option value="2">고정 2개</option></select>'
-            + '<select data-loa-hsi-bracelet-random-count><option value="">자동 추정 사용</option><option value="1">랜덤 1개</option><option value="2">랜덤 2개</option><option value="3">랜덤 3개</option></select>';
-          braceletPanel.appendChild(row);
-          if (loadedMemoryHints) applyBraceletSlotInputsFromMemory(loadedMemoryHints);
         }
         function patchStaticLabels() {
           var tries = 0;
           var timer = setInterval(function () {
             tries += 1;
             var badge = document.querySelector('.hero .eyebrow');
-            if (badge) badge.textContent = 'LOA-HSI v60.1';
+            if (badge) badge.textContent = 'LOA-HSI v60.2';
             var list = document.querySelector('.version-history-list');
-            if (list && !list.querySelector('[data-version="v60.1"]')) {
+            if (list && !list.querySelector('[data-version="v60.2"]')) {
               var item = document.createElement('p');
-              item.dataset.version = 'v60.1';
-              item.innerHTML = '<strong>v60.1</strong> 시장가 기반 장신구/팔찌 비용을 운 판정과 분리하고, 팔찌 기대값을 필요한 카테고리 개수 기준으로 보정했습니다.';
+              item.dataset.version = 'v60.2';
+              item.innerHTML = '<strong>v60.2</strong> 팔찌 구조 입력을 React로 옮기고, 현재 팔찌 옵션 개수와 맞지 않는 고정/랜덤 조합은 선택하지 못하게 했습니다.';
               list.prepend(item);
             }
-            injectBraceletSlotInputs();
             if (currentCharacter) renderMemoryPanel(currentCharacter);
             if ((badge && list) || tries >= 30) clearInterval(timer);
           }, 150);
@@ -282,12 +249,8 @@
           if (String(url).indexOf('/simulations/compare-character') >= 0 && args[1] && args[1].body) {
             try {
               var payload = JSON.parse(args[1].body);
-              var slots = readBraceletSlotInputs();
               var memoryHints = cloneJson(payload.memoryHints || {});
               if (loadedMemoryHints) memoryHints = cloneJson(loadedMemoryHints);
-              memoryHints.braceletAcquisition = memoryHints.braceletAcquisition || {};
-              if (slots.fixedOptionCount !== '') memoryHints.braceletAcquisition.fixedOptionCount = slots.fixedOptionCount;
-              if (slots.randomOptionSlotCount !== '') memoryHints.braceletAcquisition.randomOptionSlotCount = slots.randomOptionSlotCount;
               payload.memoryHints = memoryHints;
               comparePayloadForSave = cloneJson(payload);
               pendingComparePayload = comparePayloadForSave;
