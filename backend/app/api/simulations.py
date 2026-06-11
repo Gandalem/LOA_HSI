@@ -16,7 +16,7 @@ from app.services.dataset_writer import DatasetWriter
 from app.services.class_preset import resolve_class_engraving_preset
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
-MODEL_VERSION = "v60-market-cost-model"
+MODEL_VERSION = "v60.1-market-cost-calibrated"
 
 
 def _points_from_stone_type(value: str | None):
@@ -83,8 +83,8 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         "장비 재련은 로컬 T4 재련표와 DB 재료 시세를 기준으로 기본 재료/기본 성공확률만 계산합니다.",
         "어빌리티 스톤은 API로 가져온 현재 활성 레벨 결과를 목표로 보고, 사용자가 기억한 시도 개수와 비교합니다.",
         "장신구 효과는 공식 확률표와 매칭한 뒤 중복 제외 보정 기반 기대 시도 수를 계산합니다.",
-        "v60 시장가 모델은 장신구 유사 매물 비용과 팔찌 베이스+돌 비용을 운 판정과 분리해 표시합니다.",
-        "v60 1차 시장가 모델은 실제 거래소 매물 조회 전 단계의 조건 기반 추정값입니다.",
+        "v60.1 시장가 모델은 사용자가 확인한 매물 가격대에 맞춰 장신구 유사 매물 비용과 팔찌 베이스+돌 비용을 낮게 보정해 표시합니다.",
+        "v60.1 시장가 모델은 실제 거래소 매물 조회 전 단계의 임시 추정값입니다.",
         "팔찌 T4는 구매 시 고정 옵션과 랜덤 옵션 슬롯이 섞여 있고 구매 후 계정 귀속되는 구조로 해석합니다.",
         "팔찌 고정/랜덤 슬롯 수는 기본 자동 추정하며, 수동 입력이 있으면 수동 입력을 우선합니다.",
         "기억 기반 보조 판정은 프론트에서 브라우저 localStorage에만 저장할 수 있으며 서버 DB에는 사용자별 기억 기록으로 저장하지 않습니다.",
