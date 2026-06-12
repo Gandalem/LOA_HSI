@@ -20,15 +20,6 @@ function cloneJson(value) {
   }
 }
 
-function formatSavedAt(value) {
-  if (!value) return '-';
-  try {
-    return new Date(value).toLocaleString('ko-KR');
-  } catch (error) {
-    return value;
-  }
-}
-
 function readSavedMemory(character) {
   const characterName = characterNameOf(character);
   if (!characterName) return null;
@@ -59,10 +50,9 @@ function writeMemoryRecord(character, memoryHints) {
   return { ...record, __key: key };
 }
 
-export default function MemoryPersistencePanel({ character, saveRequest }) {
+export default function MemoryPersistencePanel({ character, saveRequest, onLoadMemoryHints }) {
   const [saved, setSaved] = useState(null);
   const [statusText, setStatusText] = useState('');
-  const [ignoredKeys, setIgnoredKeys] = useState({});
 
   const memoryKey = useMemo(() => {
     const name = characterNameOf(character);
@@ -84,79 +74,49 @@ export default function MemoryPersistencePanel({ character, saveRequest }) {
     if (!saveRequest?.id || !saveRequest?.character || !saveRequest?.memoryHints) return;
     try {
       const record = writeMemoryRecord(saveRequest.character, saveRequest.memoryHints);
-      if (record && record.__key === memoryKey) {
-        setSaved(record);
-        setIgnoredKeys((prev) => ({ ...prev, [record.__key]: false }));
-      }
-      setStatusText('현재 기억 기록을 이 브라우저에 저장했습니다.');
+      if (record && record.__key === memoryKey) setSaved(record);
+      setStatusText('저장 완료');
     } catch (error) {
-      setStatusText('브라우저 저장소에 기록을 저장하지 못했습니다.');
+      setStatusText('저장 실패');
     }
   }, [saveRequest, memoryKey]);
 
   if (!character || !memoryKey) return null;
 
-  const isIgnored = Boolean(ignoredKeys[memoryKey]);
-  const visibleSaved = saved && !isIgnored ? saved : null;
-
   function loadMemory() {
     if (!saved?.memoryHints) return;
     try {
-      window.dispatchEvent(new CustomEvent('loa-hsi-load-memory-hints', {
-        detail: { memoryHints: cloneJson(saved.memoryHints), character }
-      }));
-      setIgnoredKeys((prev) => ({ ...prev, [memoryKey]: false }));
-      setStatusText('저장된 기억 기록을 화면 입력값에 반영했습니다.');
+      onLoadMemoryHints?.(cloneJson(saved.memoryHints), character);
+      setStatusText('불러옴');
     } catch (error) {
-      setStatusText('저장된 기억 기록을 불러오지 못했습니다.');
+      setStatusText('불러오기 실패');
     }
-  }
-
-  function ignoreMemory() {
-    setIgnoredKeys((prev) => ({ ...prev, [memoryKey]: true }));
-    setStatusText('이번 세션에서 저장 기록을 무시합니다.');
-  }
-
-  function unignoreMemory() {
-    setIgnoredKeys((prev) => ({ ...prev, [memoryKey]: false }));
-    setStatusText('저장 기록을 다시 표시합니다.');
   }
 
   function deleteMemory() {
     try {
       window.localStorage.removeItem(memoryKey);
       setSaved(null);
-      setIgnoredKeys((prev) => ({ ...prev, [memoryKey]: false }));
-      setStatusText('저장된 기억 기록을 삭제했습니다.');
+      setStatusText('삭제 완료');
     } catch (error) {
-      setStatusText('저장된 기억 기록을 삭제하지 못했습니다.');
+      setStatusText('삭제 실패');
     }
   }
 
   return (
     <div className="notice-panel loa-hsi-memory-panel" data-loa-hsi-memory-panel="true">
-      <strong>기억 기록 저장 상태</strong>
-      <p className="hint">v58부터 기억 기반 보조 판정은 서버가 아니라 이 브라우저 localStorage에만 저장합니다. 클라우드 배포 후에도 다른 사용자와 공유되지 않습니다.</p>
-
-      {visibleSaved ? (
-        <>
-          <p className="hint">이 캐릭터에 저장된 기록이 있습니다. 마지막 저장: {formatSavedAt(visibleSaved.savedAt)}</p>
-          <div className="row">
+      <div className="row compact-memory-row">
+        <strong>기억 기록</strong>
+        {saved ? (
+          <span className="row">
             <button type="button" className="ghost tiny-button" onClick={loadMemory}>불러오기</button>
-            <button type="button" className="ghost tiny-button" onClick={ignoreMemory}>무시</button>
             <button type="button" className="ghost tiny-button" onClick={deleteMemory}>삭제</button>
-          </div>
-        </>
-      ) : isIgnored ? (
-        <>
-          <p className="hint">이번 세션에서는 저장된 기록을 무시합니다. 리포트 생성 시 현재 입력값이 다시 저장됩니다.</p>
-          <div className="row"><button type="button" className="ghost tiny-button" onClick={unignoreMemory}>다시 보기</button></div>
-        </>
-      ) : (
-        <p className="hint">저장된 기록이 없습니다. 억까 리포트 생성 시 현재 입력값이 자동 저장됩니다.</p>
-      )}
-
-      {statusText && <p className="hint"><strong>{statusText}</strong></p>}
+          </span>
+        ) : (
+          <small className="hint">저장 없음</small>
+        )}
+        {statusText && <small className="hint">{statusText}</small>}
+      </div>
     </div>
   );
 }
