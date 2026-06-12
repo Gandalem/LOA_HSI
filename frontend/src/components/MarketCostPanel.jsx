@@ -45,7 +45,7 @@ function AccessoryMarketChip({ item }) {
     <div className={failed ? 'combo-chip muted-chip' : 'combo-chip'}>
       <span>{item?.partLabel || item?.slot || '장신구'} · 품질 {item?.quality ?? '-'}</span>
       <strong>{priceText(estimate.medianGold, failed)}</strong>
-      <small>{failed ? (estimate.failureReason || '경매장 매물을 찾지 못했습니다.') : `${gold(estimate.minGold)} ~ ${gold(estimate.q75Gold)} · {item?.qualityBand || '-'}`}</small>
+      <small>{failed ? (estimate.failureReason || '경매장 매물을 찾지 못했습니다.') : `${gold(estimate.minGold)} ~ ${gold(estimate.q75Gold)} · ${item?.qualityBand || '-'}`}</small>
     </div>
   );
 }
