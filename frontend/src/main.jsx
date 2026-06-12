@@ -7,6 +7,7 @@ import HoningTablePanel from './components/HoningTablePanel.jsx';
 import MemoryPersistencePanel from './components/MemoryPersistencePanel.jsx';
 import BraceletSlotStructureSelector, { normalizeBraceletSlotStructure } from './components/BraceletSlotStructureSelector.jsx';
 import './styles/app.css';
+import './styles/public-ui.css';
 
 function App() {
   const [characterName, setCharacterName] = useState('');
@@ -170,23 +171,18 @@ function App() {
   function materialPriceSummary() {
     const items = materialPrices?.items || [];
     const valid = items.filter((x) => x.unitPriceGold !== null && x.unitPriceGold !== undefined);
-    if (priceLoading && !items.length) return '재련 재료 시세를 자동으로 불러오는 중입니다.';
-    if (!items.length) {
-      if (autoPriceStatus?.ok === false) return `시세 자동 수집 실패 · 기본값으로 계산 중 (${autoPriceStatus.error || '원인 미상'})`;
-      return '저장된 시세가 아직 없습니다. 기본값으로 먼저 계산하고, 서버가 자동 수집을 시도합니다.';
-    }
-    if (materialPrices?.cacheUsed) return materialPrices.message || '저장된 DB 시세를 재사용했습니다.';
-    if (materialPrices?.message) return materialPrices.message;
-    const last = items.map((x) => x.collectedAt).filter(Boolean).sort().at(-1);
-    return `${valid.length}/${items.length}개 재료 가격 적용${last ? ` · 기준 ${last}` : ''}`;
+    if (priceLoading && !items.length) return '재련 재료 시세를 불러오는 중입니다.';
+    if (!items.length) return '기본 시세로 계산합니다.';
+    if (materialPrices?.cacheUsed) return '저장된 시세를 적용했습니다.';
+    if (materialPrices?.message) return '시세를 적용했습니다.';
+    return `시세 적용 ${valid.length}/${items.length}`;
   }
 
   function priceBadgeText() {
     const items = materialPrices?.items || [];
-    if (priceLoading && !items.length) return '자동 로드 중';
-    if (items.length) return materialPrices?.cacheUsed ? 'DB 시세 적용' : '시세 적용됨';
-    if (autoPriceStatus?.ok === false || priceAutoLoaded === false) return '기본값 계산 중';
-    return '자동 로드 대기';
+    if (priceLoading && !items.length) return '시세 확인 중';
+    if (items.length) return '시세 적용';
+    return '기본 시세';
   }
 
   function materialPriceChipText(item) {
@@ -460,7 +456,7 @@ function App() {
         <div className="memory-panel">
           <div>
             <h3>기억 기반 보조 판정</h3>
-            <p className="hint">실제 사용 골드는 묻지 않습니다. 현재 캐릭터의 장비 성장 중 기억나는 장기백 구간만 입력합니다. 구간이 애매하면 “모름”으로 두면 참고 단서로만 봅니다.</p>
+            <p className="hint">기억나는 실패 구간이 있으면 입력하세요. 없으면 비워둬도 됩니다.</p>
           </div>
 
           <MemoryPersistencePanel
@@ -474,7 +470,7 @@ function App() {
               <strong>장기백 기록</strong>
               <button type="button" className="ghost tiny-button" onClick={addPityRecord} disabled={!modules.equipment}>기록 추가</button>
             </div>
-            <p className="hint">예: 무기 · +17 → +18. 같은 장기백을 여러 번 겪었다면 기록을 여러 줄 추가하세요. 현재 캐릭터가 도달한 강화 구간만 선택지에 표시합니다.</p>
+            <p className="hint">기억나는 장기백 구간만 추가하세요.</p>
             <div className="pity-record-list">
               {(memoryHints.pityRecords || []).map((record, index) => (
                 <div className="pity-record-row" key={index}>
@@ -501,15 +497,15 @@ function App() {
           </div>
 
           <div className="form-grid memory-grid numeric-memory-grid v36-memory-grid">
-            <label>스톤 시도 개수<span><input type="number" min="0" step="1" value={memoryHints.stoneAttempts} onChange={(e) => setMemory('stoneAttempts', e.target.value)} placeholder="예: 120" /> 개</span><small>입력값이 매우 크면 “입력값이 사실이라면 극단적 억까”로 해석합니다.</small></label>
-            <label>가상 성장 샘플 수<span><select value={simulationCount} onChange={(e) => setSimulationCount(e.target.value)}><option value="10000">1만 회 가상 성장</option><option value="100000">10만 회 가상 성장</option><option value="300000">30만 회 가상 성장</option></select></span><small>실제 유저 수가 아니라 현재 캐릭터 목표 스펙까지 도달하는 가상 성장 비용 샘플 수입니다.</small></label>
+            <label>스톤 시도 개수<span><input type="number" min="0" step="1" value={memoryHints.stoneAttempts} onChange={(e) => setMemory('stoneAttempts', e.target.value)} placeholder="예: 120" /> 개</span></label>
+            <label>가상 성장 샘플 수<span><select value={simulationCount} onChange={(e) => setSimulationCount(e.target.value)}><option value="10000">1만 회 가상 성장</option><option value="100000">10만 회 가상 성장</option><option value="300000">30만 회 가상 성장</option></select></span></label>
             <label>100골드 원화 환산<span><input type="number" step="1" value={krwPer100Gold} onChange={(e) => setKrwPer100Gold(e.target.value)} /> 원</span></label>
           </div>
 
           <div className={`accessory-acquisition-panel ${modules.accessory ? '' : 'disabled-panel'}`}>
             <div>
               <h3>장신구 획득 방식</h3>
-              <p className="hint">구매한 장신구는 운 점수에 넣지 않습니다. 직접 옵션을 시도한 장신구만 시도 수를 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>
+              <p className="hint">직접 옵션을 시도한 장신구만 입력하세요.</p>
             </div>
             <div className="accessory-acquisition-list">
               {accessoryRows().map((item) => {
@@ -541,7 +537,7 @@ function App() {
           <div className={`accessory-acquisition-panel ${modules.accessory ? '' : 'disabled-panel'}`}>
             <div>
               <h3>팔찌 랜덤 옵션 시도</h3>
-              <p className="hint">팔찌는 완성품 구매가 아니라 베이스 팔찌를 산 뒤 랜덤 옵션을 직접 돌리는 구조로 봅니다. 직접 돌린 경우에만 시도 수를 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>
+              <p className="hint">직접 돌린 팔찌만 시도 수를 입력하세요.</p>
             </div>
             {braceletRow() ? (
               <>
@@ -580,65 +576,6 @@ function App() {
 
       {error && <div className="error-box">{error}</div>}
       <ResultPanel result={result} memoryHints={memoryHints} />
-
-        <details className="notice-panel footer-notice-panel">
-          <summary>공지사항 / 업데이트 내역</summary>
-          <div className="notice-list version-history-list">
-            <p><strong>v60.2</strong> 팔찌 구조 입력을 React로 옮기고, 현재 팔찌 옵션 개수와 맞지 않는 고정/랜덤 조합은 선택하지 못하게 했습니다.</p>
-            <p><strong>v59</strong> 시뮬레이션 수 표현을 “명”에서 “회 가상 성장”으로 바꾸고, 실제 유저 데이터가 아니라 가상 성장 샘플이라는 점을 명확히 했습니다.</p>
-            <p><strong>v51</strong> 리포트 생성 시 캐릭터/장비/장신구/팔찌/스톤/기억 입력을 로컬 Parquet 데이터셋으로 저장하고, /api/dataset/status로 상태를 확인할 수 있게 했습니다.</p>
-            <p><strong>v50</strong> 장신구 현재 옵션을 공식 확률표와 직접 매칭하고, 중복 제외 보정 기반 기대 시도 수를 백엔드 응답에 추가했습니다.</p>
-            <p><strong>v49</strong> 공식 장신구/팔찌 확률표 데이터 구조를 정리하고, 실제 비용 미입력 시 percentile 판정을 숨기도록 보완했습니다.</p>
-            <p><strong>v48</strong> 아이템 레벨 숫자 파싱 오류를 수정하고, non-root Docker 환경에서 /app/data 권한을 자동 보정하도록 data-init 단계를 추가했습니다.</p>
-            <p><strong>v47</strong> SonarCloud 1차 정리로 정규식 입력 길이 제한/공통 추출 헬퍼를 추가하고, 항상 참 조건·mutable default 의심 지점·Docker root 실행 경고를 보완했습니다.</p>
-            <p><strong>v46</strong> 팔찌 획득 방식을 베이스 구매/직접 획득 후 랜덤 옵션 시도 구조로 정리하고, 직접 돌린 팔찌는 시도 수를 기대값과 비교해 억까/상쇄 점수에 반영했습니다.</p>
-            <p><strong>v45</strong> 계산 근거 영역을 표 중심에서 모바일 친화 카드형으로 정리하고, 모바일 화면 레이아웃을 보강했습니다.</p>
-            <p><strong>v44</strong> 장신구별 획득 방식을 추가했습니다. 직접 옵션 시도한 장신구는 시도 수를 입력하면 공식 확률표 기반 기대값과 비교해 억까/상쇄 점수에 반영합니다.</p>
-            <p><strong>v43</strong> 최종 억까 지수 공식을 장비+스톤 중심으로 정리하고, 상쇄 단서를 최종 점수에서 차감하도록 수정했습니다. 장신구 공식 확률표를 로컬 데이터로 추가했습니다.</p>
-            <p><strong>v42</strong> 스톤 시도 수가 기대값을 크게 초과하면 “가능성 있음”이 아니라 강한/극단적 억까로 판정하도록 수정했습니다. 비정상적으로 큰 입력은 재확인 안내를 함께 표시합니다.</p>
-            <p><strong>v41</strong> 장기백 입력에서 횟수와 시점 선택을 제거하고, 기록을 부위+강화구간 단위로 단순화했습니다. 강화 구간은 +11부터 현재 강화 단계까지 표시합니다.</p>
-            <p><strong>v40</strong> 에기르 장비와 운명의 전율 장비의 재련표 라벨을 분리하고, 캐릭터 장비 이름 기준으로 재련표 구간을 자동 선택하도록 수정했습니다. 백엔드 준비 전 API 502가 보이는 문제를 줄이기 위해 재시도와 헬스체크를 추가했습니다.</p>
-            <p><strong>v39</strong> 장기백 횟수 입력을 0~20회로 제한하고, 현재 캐릭터가 도달한 강화 구간만 선택지에 표시하도록 정리했습니다. 세부 분석은 결과 생성 시 기본 접힘 상태로 유지합니다.</p>
-            <p><strong>v38</strong> 결과 화면을 더 압축하고, 현재 캐릭터와 맞지 않는 장기백 기록은 강한 점수로 반영하지 않도록 보정했습니다. 공지사항을 하단으로 이동했습니다.</p>
-            <p><strong>v37</strong> 결과 화면을 간소화하고, 세부 계산은 접기 영역으로 이동했습니다. 체감 구간 선택을 제거하고, 선택하지 않은 분석 항목은 “분석 제외”로 표시합니다.</p>
-            <p><strong>v36</strong> 억까 단서와 재현 난이도를 분리하고, 장기백을 부위·강화 구간·시점 기반으로 입력하게 변경했습니다.</p>
-            <p><strong>v35</strong> 첫 접속 시 DB 시세를 자동 로드하고, 유효한 시세가 있으면 거래소 API를 다시 호출하지 않게 했습니다.</p>
-            <p><strong>v34</strong> 직업각인 프리셋을 캐릭터 조회 결과에 맞춰 자동 적용하고, 서버 시작 시 재련 재료 시세 자동 수집을 추가했습니다.</p>
-            <p><strong>v33</strong> 장신구 핵심 유효 종류/효과 수를 분리하고, 팔찌 옵션을 핵심·보조·조건부로 정리했습니다.</p>
-            <p><strong>v32</strong> 스톤 시도 수가 기대값보다 적으면 억까 점수를 주지 않고, 서포터 장신구/팔찌 판정을 강화했습니다.</p>
-            <p><strong>v31</strong> 억까 지수와 재현 난이도를 분리하고, 기억 입력이 없으면 판정 보류로 표시했습니다.</p>
-            <p><strong>v30</strong> 장기백 횟수와 스톤 시도 수를 직접 입력하게 하고, 여러 억까 구간 선택을 지원했습니다.</p>
-            <p><strong>v29</strong> 실제 사용 골드 입력 중심에서 캐릭터 결과물 기반 억까 리포트 구조로 전환했습니다.</p>
-            <p><strong>v28</strong> 어빌리티 스톤 3/1을 성공 횟수가 아니라 활성 레벨로 해석하도록 수정했습니다.</p>
-            <p><strong>v27</strong> 재련 재료비의 파편 단가 환산 오류를 수정하고 보조재료 최적화 기능을 제거했습니다.</p>
-            <p><strong>v26</strong> 묶음 단위 가격 환산과 재련비 최적화 계산을 시도했습니다.</p>
-            <p><strong>v25</strong> 보조재료 시세 수집과 접이식 제련 확률표를 추가했습니다.</p>
-            <p><strong>v24</strong> 제련 단계별 재료량과 성공 확률표를 추가했습니다.</p>
-            <p><strong>v23</strong> 기대값 프리셋과 장비·스톤·장신구 계산 기준을 정리했습니다.</p>
-            <p><strong>v22</strong> 비교 항목 체크박스와 장신구 효과 표시를 개선했습니다.</p>
-            <p><strong>v21</strong> 기대값 계산 결과를 DB/캐시에 저장해 반복 계산 시간을 줄였습니다.</p>
-            <p><strong>v20</strong> 팔찌 효과 상세 파싱과 표시를 개선했습니다.</p>
-            <p><strong>v19</strong> 프론트엔드 API 프록시 경로 문제를 수정했습니다.</p>
-            <p><strong>v18</strong> Windows/Docker 환경의 nginx 실행 문제를 보완했습니다.</p>
-            <p><strong>v17</strong> 어빌리티 스톤 슬롯/표시 문제를 수정했습니다.</p>
-            <p><strong>v16</strong> 팔찌 특수효과 파싱을 개선했습니다.</p>
-            <p><strong>v15</strong> nginx 기본 페이지가 보이는 문제를 수정했습니다.</p>
-            <p><strong>v14</strong> 거래소 시세 수집 POST 요청 오류를 수정했습니다.</p>
-            <p><strong>v13</strong> 재료 시세 API 500 오류와 프론트 예외를 수정했습니다.</p>
-            <p><strong>v12</strong> Docker 빌드 중 npm install 문제를 보완했습니다.</p>
-            <p><strong>v11</strong> 재련 재료 시세 수집 기능을 추가했습니다.</p>
-            <p><strong>v10</strong> 팔찌와 스톤 표시를 함께 정리했습니다.</p>
-            <p><strong>v9</strong> 어빌리티 스톤 효과 표시 방식을 개선했습니다.</p>
-            <p><strong>v8</strong> 캐릭터 조회 실패 문제를 수정했습니다.</p>
-            <p><strong>v7</strong> pyLoa 구조를 참고해 캐릭터 조회 방식을 보완했습니다.</p>
-            <p><strong>v6</strong> 어빌리티 스톤을 한 개 기준으로 단순 표시하도록 변경했습니다.</p>
-            <p><strong>v5</strong> 어빌리티 스톤 파싱 오류를 수정했습니다.</p>
-            <p><strong>v4</strong> 사용자 친화적인 라벨과 표시 문구를 정리했습니다.</p>
-            <p><strong>v3</strong> DB 캐시 구조를 추가했습니다.</p>
-            <p><strong>v2</strong> 캐릭터 비교 화면의 기본 구조를 만들었습니다.</p>
-            <p><strong>v1</strong> 로스트아크 성장 억까 판정기 아이디어와 초기 스타터 구조를 잡았습니다.</p>
-          </div>
-        </details>
     </main>
   );
 }
