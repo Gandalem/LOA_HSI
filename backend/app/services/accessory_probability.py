@@ -78,8 +78,8 @@ def _grade_from_thresholds(value: float | None, thresholds: list[tuple[float, st
 
 ACCESSORY_OPTION_DEFS: dict[str, list[dict[str, Any]]] = {
     "necklace": [
-        {"name": "추가 피해", "keywords": ["추가 피해"], "roles": ["dealer"], "thresholds": [(1.6, "상"), (1.2, "중"), (0.0, "하")]},
-        {"name": "적에게 주는 피해", "keywords": ["적에게 주는 피해"], "roles": ["dealer"], "thresholds": [(1.2, "상"), (0.75, "중"), (0.0, "하")]},
+        {"name": "추가 피해", "keywords": ["추가 피해"], "roles": ["dealer"], "thresholds": [(2.6, "상"), (1.6, "중"), (0.0, "하")]},
+        {"name": "적에게 주는 피해", "keywords": ["적에게 주는 피해"], "roles": ["dealer"], "thresholds": [(2.0, "상"), (1.2, "중"), (0.0, "하")]},
         {"name": "세레나데/신앙/조화 게이지 획득량", "keywords": ["세레나데", "신앙", "조화 게이지"], "roles": ["support"], "thresholds": [(8.0, "상"), (5.0, "중"), (0.0, "하")]},
         {"name": "낙인력", "keywords": ["낙인력"], "roles": ["support"], "thresholds": [(8.0, "상"), (5.0, "중"), (0.0, "하")]},
         {"name": "최대 생명력", "keywords": ["최대 생명력"], "roles": ["secondary"], "thresholds": [(1.0, "하")]},
@@ -87,17 +87,17 @@ ACCESSORY_OPTION_DEFS: dict[str, list[dict[str, Any]]] = {
     ],
     "earring": [
         {"name": "무기 공격력 %", "keywords": ["무기 공격력"], "requiresPercent": True, "roles": ["dealer"], "thresholds": [(3.0, "상"), (1.8, "중"), (0.0, "하")]},
-        {"name": "공격력 %", "keywords": ["공격력"], "requiresPercent": True, "roles": ["dealer"], "thresholds": [(0.95, "상"), (0.55, "중"), (0.0, "하")]},
+        {"name": "공격력 %", "keywords": ["공격력"], "requiresPercent": True, "roles": ["dealer"], "thresholds": [(1.55, "상"), (0.95, "중"), (0.0, "하")]},
         {"name": "파티원 회복 효과", "keywords": ["파티원 회복", "회복 효과"], "roles": ["support"], "thresholds": [(3.0, "상"), (1.5, "중"), (0.0, "하")]},
         {"name": "파티원 보호막 효과", "keywords": ["파티원 보호막", "보호막 효과"], "roles": ["support"], "thresholds": [(3.0, "상"), (1.5, "중"), (0.0, "하")]},
         {"name": "최대 생명력", "keywords": ["최대 생명력"], "roles": ["secondary"], "thresholds": [(1.0, "하")]},
         {"name": "최대 마나", "keywords": ["최대 마나"], "roles": ["secondary"], "thresholds": [(1.0, "하")]},
     ],
     "ring": [
-        {"name": "치명타 적중률", "keywords": ["치명타 적중률"], "roles": ["dealer"], "thresholds": [(0.95, "상"), (0.7, "중"), (0.0, "하")]},
-        {"name": "치명타 피해", "keywords": ["치명타 피해"], "roles": ["dealer"], "thresholds": [(2.4, "상"), (1.8, "중"), (0.0, "하")]},
-        {"name": "아군 공격력 강화 효과", "keywords": ["아군 공격력 강화"], "roles": ["support"], "thresholds": [(3.0, "상"), (1.5, "중"), (0.0, "하")]},
-        {"name": "아군 피해량 강화 효과", "keywords": ["아군 피해량 강화"], "roles": ["support"], "thresholds": [(7.5, "상"), (5.0, "중"), (0.0, "하")]},
+        {"name": "치명타 적중률", "keywords": ["치명타 적중률"], "roles": ["dealer"], "thresholds": [(1.55, "상"), (0.95, "중"), (0.4, "하")]},
+        {"name": "치명타 피해", "keywords": ["치명타 피해"], "roles": ["dealer"], "thresholds": [(4.0, "상"), (2.4, "중"), (1.1, "하")]},
+        {"name": "아군 공격력 강화 효과", "keywords": ["아군 공격력 강화"], "roles": ["support"], "thresholds": [(5.0, "상"), (3.0, "중"), (1.35, "하")]},
+        {"name": "아군 피해량 강화 효과", "keywords": ["아군 피해량 강화"], "roles": ["support"], "thresholds": [(7.5, "상"), (4.5, "중"), (2.0, "하")]},
         {"name": "최대 생명력", "keywords": ["최대 생명력"], "roles": ["secondary"], "thresholds": [(1.0, "하")]},
         {"name": "최대 마나", "keywords": ["최대 마나"], "roles": ["secondary"], "thresholds": [(1.0, "하")]},
     ],
@@ -229,7 +229,7 @@ def build_official_accessory_effect_summary(character: CharacterSummary, class_p
     matched_count = sum(int(row.get("matchedCount") or 0) for row in items)
     unmatched_count = sum(int(row.get("unmatchedCount") or 0) for row in items)
     return {
-        "version": "v50-official-accessory-effect-matching",
+        "version": "v60.4-accessory-grade-thresholds",
         "role": role,
         "source": (_official_table().get("metadata") or {}).get("sourceUrl"),
         "duplicateRule": (_official_table().get("duplicateRule") or {}),
