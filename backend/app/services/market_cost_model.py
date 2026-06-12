@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.settings import get_settings
 from app.models.schemas import CharacterSummary, EquipmentItem
+from app.services.lostark_client import LostArkClient
 
 
 def _n(value: Any, default: float = 0.0) -> float:
@@ -49,6 +51,10 @@ def _part_label(part: str) -> str:
     return {"necklace": "목걸이", "earring": "귀걸이", "ring": "반지"}.get(part, "장신구")
 
 
+def _auction_category_code(part: str) -> int | None:
+    return {"necklace": 200010, "earring": 200020, "ring": 200030}.get(part)
+
+
 def _quality_band(q: int | None) -> str:
     if q is None:
         return "품질 미상"
@@ -63,30 +69,111 @@ def _quality_band(q: int | None) -> str:
     return "70 미만"
 
 
-def _quality_mult(q: int | None) -> float:
-    if q is None:
-        return 1.0
-    if q >= 80:
-        return min(1.12, 1.0 + (q - 80) * 0.005)
-    return max(0.75, 1.0 - (80 - q) * 0.004)
+def _find_numeric(obj: Any, keys: list[str]) -> float | None:
+    if isinstance(obj, dict):
+        for key in keys:
+            if key in obj and obj[key] is not None:
+                try:
+                    return float(str(obj[key]).replace(",", ""))
+                except Exception:
+                    pass
+        for value in obj.values():
+            found = _find_numeric(value, keys)
+            if found is not None:
+                return found
+    elif isinstance(obj, list):
+        for value in obj:
+            found = _find_numeric(value, keys)
+            if found is not None:
+                return found
+    return None
+
+
+def _auction_items(data: Any) -> list[dict[str, Any]]:
+    if isinstance(data, dict):
+        items = data.get("Items") or data.get("items")
+        return [row for row in items if isinstance(row, dict)] if isinstance(items, list) else []
+    if isinstance(data, list):
+        return [row for row in data if isinstance(row, dict)]
+    return []
+
+
+def _auction_prices(data: Any) -> list[float]:
+    prices: list[float] = []
+    for row in _auction_items(data):
+        value = _find_numeric(row, ["BuyPrice", "buyPrice", "CurrentMinPrice", "currentMinPrice", "BidStartPrice", "bidStartPrice"])
+        if value is not None and value > 0:
+            prices.append(float(value))
+    return sorted(prices)
+
+
+def _auction_payload(item: EquipmentItem, part: str) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "ItemLevelMin": 0,
+        "ItemLevelMax": 1800,
+        "ItemGradeQuality": int(item.quality or 0),
+        "SkillOptions": [],
+        "EtcOptions": [],
+        "Sort": "BUY_PRICE",
+        "CategoryCode": _auction_category_code(part),
+        "CharacterClass": "",
+        "ItemTier": 4,
+        "ItemGrade": item.grade or "고대",
+        "ItemName": item.name or "",
+        "PageNo": 1,
+        "SortCondition": "ASC",
+    }
+    return {key: value for key, value in payload.items() if value not in (None, "")}
+
+
+def _failed_estimate(reason: str, sample_type: str) -> dict[str, Any]:
+    return {
+        "minGold": None,
+        "q25Gold": None,
+        "medianGold": None,
+        "q75Gold": None,
+        "sampleCount": 0,
+        "sampleType": sample_type,
+        "status": "failed",
+        "failureReason": reason,
+    }
+
+
+def _auction_estimate(item: EquipmentItem, part: str) -> dict[str, Any]:
+    if not get_settings().lostark_api_key:
+        return _failed_estimate("경매장 인증 설정이 없어 조회하지 못했습니다.", "auction_missing_auth")
+    try:
+        data = LostArkClient().search_auction_items(_auction_payload(item, part), optional=True)
+    except Exception:
+        return _failed_estimate("경매장 요청에 실패했습니다.", "auction_request_failed")
+    if data is None:
+        return _failed_estimate("경매장 응답이 비어 있습니다.", "auction_empty_response")
+    prices = _auction_prices(data)
+    if not prices:
+        return _failed_estimate("조건에 맞는 경매장 매물이 없습니다.", "auction_no_listing")
+    median = prices[len(prices) // 2]
+    q25 = prices[max(0, len(prices) // 4)]
+    q75 = prices[min(len(prices) - 1, (len(prices) * 3) // 4)]
+    return {
+        "minGold": _gold(prices[0]),
+        "q25Gold": _gold(q25),
+        "medianGold": _gold(median),
+        "q75Gold": _gold(q75),
+        "sampleCount": len(prices),
+        "sampleType": "lostark_auction_api",
+        "status": "ok",
+        "failureReason": None,
+    }
 
 
 def _accessory_item(item: EquipmentItem, official: dict[str, Any] | None) -> dict[str, Any]:
     part = str((official or {}).get("part") or _part(item.slot))
-    # v60.1 calibration: observed listings for the same T4 ancient necklace can be around 18k-25k gold.
-    # Until real auction/trade search is connected, synthetic prices must stay close to that scale.
-    base = {"necklace": 11000.0, "earring": 8000.0, "ring": 8000.0}.get(part, 7000.0)
     targets = (official or {}).get("targetEffects") or []
     matched = (official or {}).get("matchedEffects") or []
     core = sum(1 for row in targets if row.get("isCore"))
     secondary = sum(1 for row in targets if row.get("isSecondary"))
-    high = sum(1 for row in targets if int(row.get("gradeRank") or 0) >= 3)
-    mid = sum(1 for row in targets if int(row.get("gradeRank") or 0) == 2)
-    mult = 1.0 + core * 0.42 + secondary * 0.08 + high * 0.13 + mid * 0.04
-    if not targets and not matched:
-        mult *= 0.75
-    median = base * _quality_mult(item.quality) * max(0.5, mult)
-    samples = max(5, 80 - core * 12 - high * 10 - (10 if item.quality and item.quality >= 90 else 0))
+    estimate = _auction_estimate(item, part)
+    ok = estimate.get("status") == "ok"
     return {
         "slot": item.slot,
         "name": item.name,
@@ -99,14 +186,7 @@ def _accessory_item(item: EquipmentItem, official: dict[str, Any] | None) -> dic
         "coreEffectCount": core,
         "secondaryEffectCount": secondary,
         "matchedEffectCount": len(matched),
-        "similarListingEstimate": {
-            "minGold": _gold(median * 0.80),
-            "q25Gold": _gold(median * 0.92),
-            "medianGold": _gold(median),
-            "q75Gold": _gold(median * 1.18),
-            "sampleCount": samples,
-            "sampleType": "observed_scale_synthetic_until_trade_api",
-        },
+        "similarListingEstimate": estimate,
         "matchingConditions": {
             "part": _part_label(part),
             "grade": item.grade or "등급 미상",
@@ -115,13 +195,21 @@ def _accessory_item(item: EquipmentItem, official: dict[str, Any] | None) -> dic
             "coreEffectCount": core,
             "validEffectCount": len(targets),
         },
-        "basis": "observed_scale_market_reproduction_v1_1",
-        "warning": "실제 유사 매물 조회 전까지는 사용자가 확인한 매물 가격대에 맞춘 임시 추정값입니다.",
+        "basis": "lostark_auction_api" if ok else "lostark_auction_api_failed_no_fallback",
+        "warning": None if ok else estimate.get("failureReason"),
     }
 
 
-def _sum(items: list[dict[str, Any]], key: str) -> float:
-    return sum(float((row.get("similarListingEstimate") or {}).get(key) or 0) for row in items)
+def _sum_available(items: list[dict[str, Any]], key: str) -> float | None:
+    if not items:
+        return None
+    total = 0.0
+    for row in items:
+        value = (row.get("similarListingEstimate") or {}).get(key)
+        if value is None:
+            return None
+        total += float(value)
+    return total
 
 
 def _bracelet_grade(item: EquipmentItem | None) -> str:
@@ -158,7 +246,7 @@ def _bracelet(character: CharacterSummary, official: dict[str, Any] | None, memo
         "expectedReproductionCostGold": _gold(expected),
         "formula": "기억 기반 비용 = 적용 베이스 비용 + 팔찌 돌 가격 × 시도 수. 직접 획득 팔찌는 베이스 비용을 0G로 봅니다.",
         "basis": "observed_scale_base_plus_reroll_stone_model_v1_1",
-        "warning": "팔찌 가격은 v60.1 임시 기본값입니다. 실제 가격 조회 연동 후 교체해야 합니다.",
+        "warning": "팔찌 가격은 임시 기본값입니다. 장신구 경매장 연동과 별개로 후속 연동 대상입니다.",
     }
 
 
@@ -166,30 +254,36 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     accessory_rows = [item for item in character.accessories if item.slot != "팔찌"]
     official_rows = (official_accessory or {}).get("items") or []
     items = [_accessory_item(item, official_rows[idx] if idx < len(official_rows) else None) for idx, item in enumerate(accessory_rows)]
+    connected_count = sum(1 for row in items if ((row.get("similarListingEstimate") or {}).get("status") == "ok"))
+    all_prices_ok = bool(items) and connected_count == len(items)
     total = {
-        "minGold": _gold(_sum(items, "minGold")),
-        "q25Gold": _gold(_sum(items, "q25Gold")),
-        "medianGold": _gold(_sum(items, "medianGold")),
-        "q75Gold": _gold(_sum(items, "q75Gold")),
+        "minGold": _gold(_sum_available(items, "minGold")),
+        "q25Gold": _gold(_sum_available(items, "q25Gold")),
+        "medianGold": _gold(_sum_available(items, "medianGold")),
+        "q75Gold": _gold(_sum_available(items, "q75Gold")),
         "itemCount": len(items),
+        "auctionConnectedItemCount": connected_count,
+        "status": "ok" if all_prices_ok else "failed",
     }
     bracelet = _bracelet(character, official_bracelet, memory_hints)
     bracelet_cost = bracelet.get("estimatedActualCostGold") or bracelet.get("expectedReproductionCostGold") or 0
+    accessory_median = total.get("medianGold")
     return {
-        "version": "v60.1-market-cost-calibrated",
-        "source": "observed_scale_heuristic_until_trade_or_auction_api",
-        "tradeApiConnected": False,
+        "version": "v60.3-auction-accessory-market-cost-strict",
+        "source": "lostark_auction_api_no_fallback",
+        "tradeApiConnected": all_prices_ok,
+        "auctionApiConnected": connected_count > 0,
         "summary": {
-            "accessoryMedianGold": total["medianGold"],
+            "accessoryMedianGold": accessory_median,
             "braceletActualGold": bracelet.get("estimatedActualCostGold"),
             "braceletExpectedGold": bracelet.get("expectedReproductionCostGold"),
-            "marketReproductionGold": _gold(float(total.get("medianGold") or 0) + float(bracelet_cost or 0)),
+            "marketReproductionGold": _gold(float(accessory_median) + float(bracelet_cost or 0)) if accessory_median is not None else None,
         },
         "accessoryMarket": {
             "items": items,
             "total": total,
-            "conditions": ["부위", "등급", "티어", "품질 구간", "핵심 옵션 수", "유효 옵션 수"],
-            "basis": "사용자가 확인한 매물 가격대에 맞춘 보수적 시장 재현 비용 추정",
+            "conditions": ["부위", "등급", "티어", "품질", "아이템명"],
+            "basis": "경매장 API 조회값만 사용합니다. 실패하거나 매물이 없으면 기존 보정값으로 대체하지 않습니다.",
         },
         "braceletMarket": bracelet,
         "separationRule": {
@@ -197,10 +291,10 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
             "luck": "운 판정은 장기백, 스톤 시도 수, 장신구 직접 연마 시도 수, 팔찌 랜덤 옵션 시도 수로 따로 봅니다.",
         },
         "limits": [
-            "v60.1은 실제 유사 매물 조회가 아니라 사용자가 확인한 매물 가격대에 맞춘 임시 추정 모델입니다.",
-            "장신구는 부위/품질/유효옵션 수를 이용하되, 실제 매물 조회 전까지 과대평가를 피하도록 낮게 보정합니다.",
-            "직접 획득한 팔찌는 기억 기반 실제 비용에서 베이스 팔찌 가격을 0G로 봅니다.",
-            "팔찌 돌 가격은 실제 API 연동 전 임시값입니다.",
+            "장신구는 경매장 API 조회값만 사용합니다.",
+            "인증 설정이 없거나 매물이 없으면 장신구 시장가는 실패로 표시합니다.",
+            "현재 경매장 검색은 아이템명/부위/등급/품질 기준입니다. 세부 옵션 완전 일치 검색은 후속 보강 대상입니다.",
+            "팔찌 가격은 후속 연동 대상입니다.",
             "운 판정과 시장 구매 비용은 한 점수로 섞지 않습니다.",
         ],
     }
