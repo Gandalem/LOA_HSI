@@ -101,7 +101,9 @@ def _auction_items(data: Any) -> list[dict[str, Any]]:
 def _auction_prices(data: Any) -> list[float]:
     prices: list[float] = []
     for row in _auction_items(data):
-        value = _find_numeric(row, ["BuyPrice", "buyPrice", "CurrentMinPrice", "currentMinPrice", "BidStartPrice", "bidStartPrice"])
+        # 시장 재현 비용은 즉시 구매 가능한 매물만 써야 합니다.
+        # 입찰 시작가, 현재 입찰가, 단순 최저가성 필드는 실제 구매 재현 비용이 아니므로 제외합니다.
+        value = _find_numeric(row, ["BuyPrice", "buyPrice"])
         if value is not None and value > 0:
             prices.append(float(value))
     return sorted(prices)
@@ -139,7 +141,15 @@ def _failed_estimate(reason: str, sample_type: str) -> dict[str, Any]:
     }
 
 
+def _has_required_option_filters(item: EquipmentItem) -> bool:
+    # 이름/품질만 맞춘 매물은 현재 장신구 옵션 가격이 아닙니다.
+    # Lost Ark 경매장 옵션 코드 매핑이 완성되기 전까지는 가격을 확정하지 않습니다.
+    return False
+
+
 def _auction_estimate(item: EquipmentItem, part: str) -> dict[str, Any]:
+    if not _has_required_option_filters(item):
+        return _failed_estimate("장신구 연마 옵션 필터가 아직 연결되지 않아 가격을 확정하지 않았습니다.", "auction_option_filter_missing")
     if not get_settings().lostark_api_key:
         return _failed_estimate("경매장 인증 설정이 없어 조회하지 못했습니다.", "auction_missing_auth")
     try:
@@ -150,7 +160,7 @@ def _auction_estimate(item: EquipmentItem, part: str) -> dict[str, Any]:
         return _failed_estimate("경매장 응답이 비어 있습니다.", "auction_empty_response")
     prices = _auction_prices(data)
     if not prices:
-        return _failed_estimate("조건에 맞는 경매장 매물이 없습니다.", "auction_no_listing")
+        return _failed_estimate("조건에 맞는 즉시 구매 매물이 없습니다.", "auction_no_buy_listing")
     median = prices[len(prices) // 2]
     q25 = prices[max(0, len(prices) // 4)]
     q75 = prices[min(len(prices) - 1, (len(prices) * 3) // 4)]
@@ -270,7 +280,7 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     accessory_median = total.get("medianGold")
     return {
         "version": "v60.3-auction-accessory-market-cost-strict",
-        "source": "lostark_auction_api_no_fallback",
+        "source": "lostark_auction_api_no_broad_match",
         "tradeApiConnected": all_prices_ok,
         "auctionApiConnected": connected_count > 0,
         "summary": {
@@ -282,8 +292,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
         "accessoryMarket": {
             "items": items,
             "total": total,
-            "conditions": ["부위", "등급", "티어", "품질", "아이템명"],
-            "basis": "경매장 API 조회값만 사용합니다. 실패하거나 매물이 없으면 기존 보정값으로 대체하지 않습니다.",
+            "conditions": ["부위", "등급", "티어", "품질", "연마 옵션"],
+            "basis": "장신구는 연마 옵션까지 정확히 필터링된 경매장 조회값만 사용합니다. 이름/품질만 맞는 넓은 매물 가격은 사용하지 않습니다.",
         },
         "braceletMarket": bracelet,
         "separationRule": {
@@ -291,9 +301,9 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
             "luck": "운 판정은 장기백, 스톤 시도 수, 장신구 직접 연마 시도 수, 팔찌 랜덤 옵션 시도 수로 따로 봅니다.",
         },
         "limits": [
-            "장신구는 경매장 API 조회값만 사용합니다.",
-            "인증 설정이 없거나 매물이 없으면 장신구 시장가는 실패로 표시합니다.",
-            "현재 경매장 검색은 아이템명/부위/등급/품질 기준입니다. 세부 옵션 완전 일치 검색은 후속 보강 대상입니다.",
+            "장신구는 연마 옵션까지 정확히 필터링된 경매장 조회값만 사용합니다.",
+            "현재 옵션 코드 매핑이 연결되지 않은 장신구는 시장가를 조회 실패로 표시합니다.",
+            "입찰가, 시작가, 이름/품질만 맞는 매물 가격은 시장 재현 비용으로 사용하지 않습니다.",
             "팔찌 가격은 후속 연동 대상입니다.",
             "운 판정과 시장 구매 비용은 한 점수로 섞지 않습니다.",
         ],
