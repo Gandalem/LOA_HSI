@@ -11,6 +11,10 @@ function number(value, digits = 1) {
   return Number(value).toLocaleString('ko-KR', { maximumFractionDigits: digits });
 }
 
+function priceText(value, failed = false) {
+  return failed ? '조회 실패' : gold(value);
+}
+
 function marketSignature(marketCost) {
   if (!marketCost) return '';
   return JSON.stringify({
@@ -20,7 +24,7 @@ function marketSignature(marketCost) {
     bracelet: marketCost.braceletMarket,
     items: ((marketCost.accessoryMarket && marketCost.accessoryMarket.items) || []).map((row) => {
       const estimate = row.similarListingEstimate || {};
-      return [row.slot, row.name, row.qualityBand, estimate.medianGold];
+      return [row.slot, row.name, row.qualityBand, estimate.medianGold, estimate.status, estimate.failureReason];
     })
   });
 }
@@ -36,11 +40,12 @@ function MarketStatLine({ label, value, highlight = false }) {
 
 function AccessoryMarketChip({ item }) {
   const estimate = item?.similarListingEstimate || {};
+  const failed = estimate.status === 'failed';
   return (
-    <div className="combo-chip">
+    <div className={failed ? 'combo-chip muted-chip' : 'combo-chip'}>
       <span>{item?.partLabel || item?.slot || '장신구'} · 품질 {item?.quality ?? '-'}</span>
-      <strong>{gold(estimate.medianGold)}</strong>
-      <small>{gold(estimate.minGold)} ~ {gold(estimate.q75Gold)} · {item?.qualityBand || '-'}</small>
+      <strong>{priceText(estimate.medianGold, failed)}</strong>
+      <small>{failed ? (estimate.failureReason || '경매장 매물을 찾지 못했습니다.') : `${gold(estimate.minGold)} ~ ${gold(estimate.q75Gold)} · {item?.qualityBand || '-'}`}</small>
     </div>
   );
 }
@@ -53,6 +58,7 @@ function MarketCostCard({ marketCost }) {
   const items = accessory.items || [];
   const limits = marketCost.limits || [];
   const signature = marketSignature(marketCost);
+  const accessoryFailed = total.status === 'failed';
 
   return (
     <div
@@ -61,30 +67,30 @@ function MarketCostCard({ marketCost }) {
       data-loa-hsi-market-v601-react="true"
       data-signature={signature}
     >
-      <h3>v60.1 시장 재현 비용</h3>
+      <h3>시장 재현 비용</h3>
       <p className="hint evidence-intro">
-        장신구/팔찌 구매 비용은 운 판정과 분리해 표시합니다. 현재 값은 실제 거래소 조회 전 단계의 임시 시장가 추정입니다.
+        장신구는 경매장 조회값만 사용합니다. 조회 실패나 매물 없음은 임시값으로 대체하지 않습니다.
       </p>
 
       <div className="evidence-card-grid">
         <section className="evidence-card">
           <div className="evidence-card-head">
             <strong>시장 재현 합계</strong>
-            <span>{marketCost.tradeApiConnected ? '실매물 연동' : '임시 추정'}</span>
+            <span>{marketCost.tradeApiConnected ? '경매장 연동' : '조회 실패 포함'}</span>
           </div>
-          <MarketStatLine label="합계" value={gold(summary.marketReproductionGold)} highlight />
-          <MarketStatLine label="장신구 중앙값" value={gold(summary.accessoryMedianGold)} />
+          <MarketStatLine label="합계" value={priceText(summary.marketReproductionGold, accessoryFailed)} highlight />
+          <MarketStatLine label="장신구 중앙값" value={priceText(summary.accessoryMedianGold, accessoryFailed)} />
           <MarketStatLine label="팔찌 기억 기반" value={gold(summary.braceletActualGold)} />
         </section>
 
         <section className="evidence-card">
           <div className="evidence-card-head">
             <strong>장신구 시장가</strong>
-            <span>{number(total.itemCount, 0)}개</span>
+            <span>{number(total.auctionConnectedItemCount ?? 0, 0)} / {number(total.itemCount, 0)}개 조회</span>
           </div>
-          <MarketStatLine label="중앙값 합계" value={gold(total.medianGold)} highlight />
-          <MarketStatLine label="하위 25%" value={gold(total.q25Gold)} />
-          <MarketStatLine label="상위 25%" value={gold(total.q75Gold)} />
+          <MarketStatLine label="중앙값 합계" value={priceText(total.medianGold, accessoryFailed)} highlight />
+          <MarketStatLine label="하위 25%" value={priceText(total.q25Gold, accessoryFailed)} />
+          <MarketStatLine label="상위 25%" value={priceText(total.q75Gold, accessoryFailed)} />
         </section>
 
         <section className="evidence-card">
@@ -101,12 +107,7 @@ function MarketCostCard({ marketCost }) {
       <div className="combo-chip-grid">
         {items.length ? items.map((item, index) => (
           <AccessoryMarketChip item={item} key={`${item.slot || 'accessory'}-${index}`} />
-        )) : <p className="hint">장신구 시장가 추정 항목이 없습니다.</p>}
-      </div>
-
-      <div className="notice-panel">
-        <strong>비용/운 분리</strong>
-        <p className="hint">구형 장신구 시뮬레이션 비용은 연마 확률 기반 참고값이고, 실제 구매 재현 비용은 이 시장가 카드의 값을 우선합니다.</p>
+        )) : <p className="hint">장신구 시장가 조회 항목이 없습니다.</p>}
       </div>
 
       {limits.length > 0 && (
