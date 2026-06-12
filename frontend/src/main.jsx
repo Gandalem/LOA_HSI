@@ -4,6 +4,7 @@ import { collectMaterialPrices, compareCharacter, getCharacterSummary, ensureMat
 import CharacterPanel from './components/CharacterPanel.jsx';
 import ResultPanel from './components/ResultPanel.jsx';
 import HoningTablePanel from './components/HoningTablePanel.jsx';
+import MemoryPersistencePanel from './components/MemoryPersistencePanel.jsx';
 import BraceletSlotStructureSelector, { normalizeBraceletSlotStructure } from './components/BraceletSlotStructureSelector.jsx';
 import './styles/app.css';
 
@@ -22,6 +23,7 @@ function App() {
   const [honingTableLoading, setHoningTableLoading] = useState(false);
   const [autoPriceStatus, setAutoPriceStatus] = useState(null);
   const [priceAutoLoaded, setPriceAutoLoaded] = useState(false);
+  const [saveMemoryRequest, setSaveMemoryRequest] = useState(null);
   const [memoryHints, setMemoryHints] = useState({
     pityRecords: [{ part: 'unknown', target: 'unknown' }],
     stoneAttempts: '',
@@ -64,67 +66,59 @@ function App() {
     });
   }, [character]);
 
-  useEffect(() => {
-    function valueOrEmpty(value) {
-      return value === null || value === undefined ? '' : String(value);
+  function valueOrEmpty(value) {
+    return value === null || value === undefined ? '' : String(value);
+  }
+
+  function normalizePityRecords(records) {
+    const current = Array.isArray(records) && records.length
+      ? records
+      : [{ part: 'unknown', target: 'unknown' }];
+
+    return current.map((record) => {
+      const part = record?.part || 'unknown';
+      const target = record?.target || 'unknown';
+      const allowedTargets = targetOptionsForPart(part);
+
+      return {
+        part,
+        target: target === 'unknown' || allowedTargets.includes(target) ? target : 'unknown'
+      };
+    });
+  }
+
+  function normalizeAccessoryAcquisitions(acquisitions, sourceCharacter) {
+    const source = acquisitions && typeof acquisitions === 'object' ? acquisitions : {};
+    const rows = accessoryRows(sourceCharacter || character);
+    const normalizeEntry = (entry) => ({
+      mode: ['unknown', 'purchased', 'polished'].includes(entry?.mode) ? entry.mode : 'unknown',
+      attempts: valueOrEmpty(entry?.attempts)
+    });
+
+    if (!rows.length) {
+      return Object.fromEntries(
+        Object.entries(source).map(([key, entry]) => [key, normalizeEntry(entry)])
+      );
     }
 
-    function normalizePityRecords(records) {
-      const current = Array.isArray(records) && records.length
-        ? records
-        : [{ part: 'unknown', target: 'unknown' }];
+    const next = {};
+    rows.forEach((row) => {
+      next[row.key] = normalizeEntry(source[row.key]);
+    });
+    return next;
+  }
 
-      return current.map((record) => {
-        const part = record?.part || 'unknown';
-        const target = record?.target || 'unknown';
-        const allowedTargets = targetOptionsForPart(part);
-
-        return {
-          part,
-          target: target === 'unknown' || allowedTargets.includes(target) ? target : 'unknown'
-        };
-      });
-    }
-
-    function normalizeAccessoryAcquisitions(acquisitions, sourceCharacter) {
-      const source = acquisitions && typeof acquisitions === 'object' ? acquisitions : {};
-      const rows = accessoryRows(sourceCharacter || character);
-      const normalizeEntry = (entry) => ({
-        mode: ['unknown', 'purchased', 'polished'].includes(entry?.mode) ? entry.mode : 'unknown',
-        attempts: valueOrEmpty(entry?.attempts)
-      });
-
-      if (!rows.length) {
-        return Object.fromEntries(
-          Object.entries(source).map(([key, entry]) => [key, normalizeEntry(entry)])
-        );
-      }
-
-      const next = {};
-      rows.forEach((row) => {
-        next[row.key] = normalizeEntry(source[row.key]);
-      });
-      return next;
-    }
-
-    function handleLoadMemoryHints(event) {
-      const loaded = event.detail?.memoryHints;
-      const sourceCharacter = event.detail?.character || character;
-      if (!loaded || typeof loaded !== 'object') return;
-
-      setMemoryHints((prev) => ({
-        ...prev,
-        ...loaded,
-        pityRecords: normalizePityRecords(loaded.pityRecords),
-        stoneAttempts: valueOrEmpty(loaded.stoneAttempts),
-        accessoryAcquisitions: normalizeAccessoryAcquisitions(loaded.accessoryAcquisitions, sourceCharacter),
-        braceletAcquisition: normalizeBraceletAcquisition(loaded.braceletAcquisition, sourceCharacter)
-      }));
-    }
-
-    window.addEventListener('loa-hsi-load-memory-hints', handleLoadMemoryHints);
-    return () => window.removeEventListener('loa-hsi-load-memory-hints', handleLoadMemoryHints);
-  }, [character]);
+  function applyLoadedMemoryHints(loaded, sourceCharacter = character) {
+    if (!loaded || typeof loaded !== 'object') return;
+    setMemoryHints((prev) => ({
+      ...prev,
+      ...loaded,
+      pityRecords: normalizePityRecords(loaded.pityRecords),
+      stoneAttempts: valueOrEmpty(loaded.stoneAttempts),
+      accessoryAcquisitions: normalizeAccessoryAcquisitions(loaded.accessoryAcquisitions, sourceCharacter),
+      braceletAcquisition: normalizeBraceletAcquisition(loaded.braceletAcquisition, sourceCharacter)
+    }));
+  }
 
   async function loadHoningTable() {
     setHoningTableLoading(true);
@@ -266,6 +260,7 @@ function App() {
       setCharacter(data.character);
       setResult(data);
       setMemoryHints((prev) => ({ ...prev, braceletAcquisition: sanitizedMemoryHints.braceletAcquisition }));
+      setSaveMemoryRequest({ id: Date.now(), character: data.character, memoryHints: sanitizedMemoryHints });
     } catch (e) {
       setError(e.message);
     } finally {
@@ -401,7 +396,7 @@ function App() {
     <main className="container">
       <header className="hero ekka-hero">
         <div>
-          <p className="eyebrow">LOA-HSI v59</p>
+          <p className="eyebrow">LOA-HSI v60.2</p>
           <h1>내가 접을 만했나? 로스트아크 성장 억까 리포트</h1>
           <p className="hero-copy">핵심 결론만 먼저 보여주고, 자세한 계산은 필요할 때 펼쳐보는 리포트입니다.</p>
         </div>
@@ -467,6 +462,12 @@ function App() {
             <h3>기억 기반 보조 판정</h3>
             <p className="hint">실제 사용 골드는 묻지 않습니다. 현재 캐릭터의 장비 성장 중 기억나는 장기백 구간만 입력합니다. 구간이 애매하면 “모름”으로 두면 참고 단서로만 봅니다.</p>
           </div>
+
+          <MemoryPersistencePanel
+            character={character}
+            saveRequest={saveMemoryRequest}
+            onLoadMemoryHints={applyLoadedMemoryHints}
+          />
 
           <div className={`pity-record-panel ${modules.equipment ? '' : 'disabled-panel'}`}>
             <div className="pity-record-header">
