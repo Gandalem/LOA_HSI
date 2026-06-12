@@ -2,11 +2,15 @@ import React from 'react';
 
 export function braceletOptionCount(item) {
   const candidates = [
+    item?.bracelet_effects,
+    item?.braceletEffects,
     item?.accessory_effects,
     item?.accessoryEffects,
     item?.effects,
     item?.parsedEffects,
-    item?.rawEffects
+    item?.rawEffects,
+    item?.optionEffects,
+    item?.options
   ];
   const effects = candidates.find((value) => Array.isArray(value));
   return effects ? effects.length : 0;
@@ -24,7 +28,7 @@ export function braceletStructureOptions(item) {
   };
 
   return [
-    { value: '', fixedOptionCount: '', randomOptionSlotCount: '', label: '자동 추정 사용' },
+    { value: '', fixedOptionCount: '', randomOptionSlotCount: '', label: total ? `자동 추정 사용 (옵션 ${total}개)` : '자동 추정 사용' },
     ...(byTotal[total] || [])
       .map((option) => ({ ...option, value: `${option.fixedOptionCount}:${option.randomOptionSlotCount}` }))
   ];
@@ -48,6 +52,7 @@ export default function BraceletSlotStructureSelector({ item, value, disabled = 
   const randomOptionSlotCount = value?.randomOptionSlotCount || '';
   const selectedValue = fixedOptionCount && randomOptionSlotCount ? `${fixedOptionCount}:${randomOptionSlotCount}` : '';
   const safeValue = options.some((option) => option.value === selectedValue) ? selectedValue : '';
+  const hasManualOptions = options.length > 1;
 
   return (
     <div className="accessory-acquisition-row" data-loa-hsi-bracelet-slot-inputs="true">
@@ -59,7 +64,7 @@ export default function BraceletSlotStructureSelector({ item, value, disabled = 
       </div>
       <select
         data-loa-hsi-bracelet-structure
-        disabled={disabled || options.length <= 1}
+        disabled={disabled || !hasManualOptions}
         value={safeValue}
         onChange={(event) => onChange?.(event.target.value)}
       >
@@ -69,6 +74,9 @@ export default function BraceletSlotStructureSelector({ item, value, disabled = 
       </select>
       {total === 5 && (
         <small className="hint">옵션 5개 팔찌는 고정 2개 / 랜덤 3개 조합만 수동 선택할 수 있습니다.</small>
+      )}
+      {!total && (
+        <small className="hint">팔찌 옵션 배열을 찾지 못해 수동 구조 선택을 잠시 막았습니다. 캐릭터 응답의 bracelet_effects 필드를 우선 사용합니다.</small>
       )}
     </div>
   );
