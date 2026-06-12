@@ -34,6 +34,8 @@ class LostArkClient:
 
     def _get(self, path: str, params: dict[str, Any] | None = None, optional: bool = False) -> Any:
         if not self.settings.lostark_api_key:
+            if optional:
+                return None
             raise HTTPException(status_code=400, detail="LOSTARK_API_KEY가 비어 있습니다. .env에 JWT를 입력하세요.")
         url = f"{self.base_url}{path}"
         try:
@@ -66,6 +68,8 @@ class LostArkClient:
 
     def _post(self, path: str, json_body: dict[str, Any] | None = None, optional: bool = False) -> Any:
         if not self.settings.lostark_api_key:
+            if optional:
+                return None
             raise HTTPException(status_code=400, detail="LOSTARK_API_KEY가 비어 있습니다. .env에 JWT를 입력하세요.")
         url = f"{self.base_url}{path}"
         try:
@@ -104,6 +108,11 @@ class LostArkClient:
         # 로스트아크 거래소 검색은 GET query가 아니라 POST body 방식입니다.
         # pyLoa의 MarketsEndpoint.search_items도 POST /markets/items를 사용합니다.
         return self._post("/markets/items", json_body=params or {})
+
+    def search_auction_items(self, payload: dict[str, Any] | None = None, optional: bool = True) -> Any:
+        # 장신구/팔찌/어빌리티 스톤은 거래소가 아니라 경매장(/auctions/items) 검색을 사용합니다.
+        # API 키가 없거나 경매장 응답이 실패하면 market cost 모델에서 기존 보정값으로 fallback합니다.
+        return self._post("/auctions/items", json_body=payload or {}, optional=optional)
 
     def post_market_trades(self, payload: dict[str, Any]) -> Any:
         # 로스트아크 거래소 최근 거래 내역도 /markets 하위입니다.
