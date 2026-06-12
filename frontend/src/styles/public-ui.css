@@ -1,0 +1,22 @@
+/* Public deployment UI cleanup: hide developer/test-only details from the default user flow. */
+.footer-notice-panel,
+.auto-price-status,
+.material-chip-row,
+.price-actions .ghost,
+.numeric-memory-grid label:has(select option[value="10000"]),
+.pity-record-panel > .hint,
+.accessory-acquisition-panel > div > .hint,
+.memory-panel > div:first-child .hint,
+.module-toggle small {
+  display: none !important;
+}
+
+.price-panel {
+  align-items: center;
+}
+
+.memory-panel h3,
+.accessory-acquisition-panel h3,
+.pity-record-header strong {
+  margin-bottom: 0;
+}
