@@ -7,7 +7,7 @@ from app.core.settings import get_settings
 from app.models.schemas import CharacterSummary, EquipmentItem
 from app.services.lostark_client import LostArkClient
 
-AUCTION_PAGE_LIMIT = 10
+AUCTION_PAGE_LIMIT = 30
 
 
 def _n(value: Any, default: float = 0.0) -> float:
@@ -269,6 +269,16 @@ def _auction_payload(item: EquipmentItem, part: str, page_no: int = 1) -> dict[s
     return payload
 
 
+def _search_cache_key(item: EquipmentItem, part: str) -> tuple[Any, ...]:
+    return (
+        _auction_category_code(part),
+        item.name or "",
+        item.grade or "고대",
+        4,
+        _quality_floor(item.quality),
+    )
+
+
 def _failed_estimate(reason: str, sample_type: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
     result = {
         "minGold": None,
@@ -285,7 +295,16 @@ def _failed_estimate(reason: str, sample_type: str, details: dict[str, Any] | No
     return result
 
 
-def _search_auction_pages(client: LostArkClient, item: EquipmentItem, part: str) -> list[dict[str, Any]]:
+def _search_auction_pages(
+    client: LostArkClient,
+    item: EquipmentItem,
+    part: str,
+    search_cache: dict[tuple[Any, ...], list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    cache_key = _search_cache_key(item, part)
+    if cache_key in search_cache:
+        return search_cache[cache_key]
+
     rows: list[dict[str, Any]] = []
     for page_no in range(1, AUCTION_PAGE_LIMIT + 1):
         data = client.search_auction_items(_auction_payload(item, part, page_no), optional=True)
@@ -293,32 +312,52 @@ def _search_auction_pages(client: LostArkClient, item: EquipmentItem, part: str)
         if not page_items:
             break
         rows.extend(page_items)
+    search_cache[cache_key] = rows
     return rows
 
 
-def _auction_estimate(item: EquipmentItem, part: str) -> dict[str, Any]:
+def _auction_estimate(
+    item: EquipmentItem,
+    part: str,
+    search_cache: dict[tuple[Any, ...], list[dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
     desired = _desired_options(item)
     if not desired:
         return _failed_estimate("현재 장신구에서 비교할 핵심 연마 옵션을 찾지 못했습니다.", "auction_option_parse_failed")
     if not get_settings().lostark_api_key:
         return _failed_estimate("경매장 인증 설정이 없어 조회하지 못했습니다.", "auction_missing_auth")
+    if search_cache is None:
+        search_cache = {}
+    cache_key = _search_cache_key(item, part)
     try:
         client = LostArkClient()
-        raw_items = _search_auction_pages(client, item, part)
+        raw_items = _search_auction_pages(client, item, part, search_cache)
     except Exception:
         return _failed_estimate("경매장 요청에 실패했습니다.", "auction_request_failed")
     if not raw_items:
         return _failed_estimate(
-            "경매장 응답에 매물이 없습니다.",
-            "auction_empty_response",
-            {"pageLimit": AUCTION_PAGE_LIMIT, "qualityFloor": _quality_floor(item.quality), "desiredOptions": [row.get("raw") for row in desired]},
+            "최근 매물 없음",
+            "auction_recent_listing_not_found",
+            {
+                "rawItemCount": 0,
+                "pageLimit": AUCTION_PAGE_LIMIT,
+                "qualityFloor": _quality_floor(item.quality),
+                "cacheKey": list(cache_key),
+                "desiredOptions": [row.get("raw") for row in desired],
+            },
         )
     prices = _auction_prices(raw_items, item, desired)
     if not prices:
         return _failed_estimate(
-            f"첫 {AUCTION_PAGE_LIMIT}페이지에서 현재 핵심 옵션과 품질 구간이 맞는 즉시 구매 매물을 찾지 못했습니다.",
-            "auction_no_matching_buy_listing",
-            {"rawItemCount": len(raw_items), "pageLimit": AUCTION_PAGE_LIMIT, "qualityFloor": _quality_floor(item.quality), "desiredOptions": [row.get("raw") for row in desired]},
+            "최근 매물 없음",
+            "auction_recent_listing_not_found",
+            {
+                "rawItemCount": len(raw_items),
+                "pageLimit": AUCTION_PAGE_LIMIT,
+                "qualityFloor": _quality_floor(item.quality),
+                "cacheKey": list(cache_key),
+                "desiredOptions": [row.get("raw") for row in desired],
+            },
         )
     median = prices[len(prices) // 2]
     q25 = prices[max(0, len(prices) // 4)]
@@ -329,19 +368,23 @@ def _auction_estimate(item: EquipmentItem, part: str) -> dict[str, Any]:
         "medianGold": _gold(median),
         "q75Gold": _gold(q75),
         "sampleCount": len(prices),
-        "sampleType": "lostark_auction_api_options_filtered_paged",
+        "sampleType": "lostark_auction_api_options_filtered_paged_cached",
         "status": "ok",
         "failureReason": None,
     }
 
 
-def _accessory_item(item: EquipmentItem, official: dict[str, Any] | None) -> dict[str, Any]:
+def _accessory_item(
+    item: EquipmentItem,
+    official: dict[str, Any] | None,
+    search_cache: dict[tuple[Any, ...], list[dict[str, Any]]],
+) -> dict[str, Any]:
     part = str((official or {}).get("part") or _part(item.slot))
     targets = (official or {}).get("targetEffects") or []
     matched = (official or {}).get("matchedEffects") or []
     core = sum(1 for row in targets if row.get("isCore"))
     secondary = sum(1 for row in targets if row.get("isSecondary"))
-    estimate = _auction_estimate(item, part)
+    estimate = _auction_estimate(item, part, search_cache)
     ok = estimate.get("status") == "ok"
     return {
         "slot": item.slot,
@@ -422,7 +465,8 @@ def _bracelet(character: CharacterSummary, official: dict[str, Any] | None, memo
 def build_market_cost_summary(character: CharacterSummary, official_accessory: dict[str, Any] | None, official_bracelet: dict[str, Any] | None, memory_hints: dict[str, Any] | None) -> dict[str, Any]:
     accessory_rows = [item for item in character.accessories if item.slot != "팔찌"]
     official_rows = (official_accessory or {}).get("items") or []
-    items = [_accessory_item(item, official_rows[idx] if idx < len(official_rows) else None) for idx, item in enumerate(accessory_rows)]
+    search_cache: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
+    items = [_accessory_item(item, official_rows[idx] if idx < len(official_rows) else None, search_cache) for idx, item in enumerate(accessory_rows)]
     connected_count = sum(1 for row in items if ((row.get("similarListingEstimate") or {}).get("status") == "ok"))
     all_prices_ok = bool(items) and connected_count == len(items)
     total = {
@@ -438,8 +482,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     bracelet_cost = bracelet.get("estimatedActualCostGold") or bracelet.get("expectedReproductionCostGold") or 0
     accessory_median = total.get("medianGold")
     return {
-        "version": "v60.9-auction-prioritized-options-quality-floor",
-        "source": "lostark_auction_api_options_filtered_paged_no_fallback",
+        "version": "v60.10-auction-30p-cache-recent-missing",
+        "source": "lostark_auction_api_options_filtered_cached_no_fallback",
         "tradeApiConnected": all_prices_ok,
         "auctionApiConnected": connected_count > 0,
         "summary": {
@@ -451,8 +495,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
         "accessoryMarket": {
             "items": items,
             "total": total,
-            "conditions": ["부위", "등급", "품질 구간", "아이템명", "가격 우선 핵심 Options", f"상위 {AUCTION_PAGE_LIMIT}페이지"],
-            "basis": "경매장을 품질 구간 하한과 이름/카테고리 기준으로 조회한 뒤, 가격 우선 핵심 옵션이 일치하는 즉시 구매 매물만 사용합니다.",
+            "conditions": ["부위", "등급", "품질 구간", "아이템명", "가격 우선 핵심 Options", f"상위 {AUCTION_PAGE_LIMIT}페이지", "검색 캐시"],
+            "basis": "같은 이름/등급/티어/품질 하한 검색은 한 번만 경매장에 요청하고 캐시를 공유합니다. 이후 가격 우선 핵심 옵션이 일치하는 즉시 구매 매물만 사용합니다.",
         },
         "braceletMarket": bracelet,
         "separationRule": {
@@ -461,8 +505,9 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
         },
         "limits": [
             f"장신구는 경매장 상위 {AUCTION_PAGE_LIMIT}페이지 응답 중 가격 우선 핵심 옵션과 일치하는 즉시 구매 매물만 사용합니다.",
+            "검색 캐시 key는 categoryCode + itemName + itemGrade + itemTier + qualityFloor입니다.",
             "품질은 검색 payload에는 구간 하한을 넣고, 후처리에서는 같은 품질 구간으로 비교합니다.",
-            "조건에 맞는 매물이 없으면 장신구 시장가는 조회 실패로 표시합니다.",
+            "조건에 맞는 매물이 없으면 장신구 시장가는 최근 매물 없음으로 표시합니다.",
             "입찰가, 시작가, 옵션 불일치 매물 가격은 시장 재현 비용으로 사용하지 않습니다.",
             "팔찌 가격은 후속 연동 대상입니다.",
         ],
