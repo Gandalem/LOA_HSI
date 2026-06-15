@@ -8,6 +8,8 @@ from app.models.schemas import CharacterSummary, EquipmentItem
 from app.services.lostark_client import LostArkClient
 
 AUCTION_PAGE_LIMIT = 30
+QUALITY_TOLERANCE_PRIMARY = 5
+QUALITY_TOLERANCE_FALLBACK = 10
 
 
 def _n(value: Any, default: float = 0.0) -> float:
@@ -72,22 +74,10 @@ def _quality_band(q: int | None) -> str:
     return "70 미만"
 
 
-def _quality_floor(q: int | None) -> int:
+def _quality_min_for_tolerance(q: int | None, tolerance: int) -> int:
     if q is None:
         return 0
-    if q >= 95:
-        return 95
-    if q >= 90:
-        return 90
-    if q >= 80:
-        return 80
-    if q >= 70:
-        return 70
-    return 0
-
-
-def _quality_band_key(q: int | None) -> str:
-    return _quality_band(q)
+    return max(0, min(100, int(q) - int(tolerance)))
 
 
 def _auction_items(data: Any) -> list[dict[str, Any]]:
@@ -203,12 +193,12 @@ def _auction_buy_price(row: dict[str, Any]) -> float | None:
         return None
 
 
-def _same_quality_band(row: dict[str, Any], quality: int | None) -> bool:
+def _quality_in_tolerance(row: dict[str, Any], quality: int | None, tolerance: int) -> bool:
     if quality is None:
         return True
     raw = row.get("GradeQuality") if "GradeQuality" in row else row.get("gradeQuality")
     try:
-        return _quality_band_key(int(raw)) == _quality_band_key(int(quality))
+        return abs(int(raw) - int(quality)) <= int(tolerance)
     except Exception:
         return False
 
@@ -229,12 +219,12 @@ def _option_matches(desired: dict[str, Any], option: dict[str, Any]) -> bool:
     return expected_percent == actual_percent
 
 
-def _auction_item_matches_current_accessory(row: dict[str, Any], item: EquipmentItem, desired: list[dict[str, Any]]) -> bool:
+def _auction_item_matches_current_accessory(row: dict[str, Any], item: EquipmentItem, desired: list[dict[str, Any]], quality_tolerance: int) -> bool:
     if item.name and str(row.get("Name") or row.get("name") or "") != str(item.name):
         return False
     if item.grade and str(row.get("Grade") or row.get("grade") or "") != str(item.grade):
         return False
-    if not _same_quality_band(row, item.quality):
+    if not _quality_in_tolerance(row, item.quality, quality_tolerance):
         return False
     options = _auction_option_rows(row)
     if not desired or not options:
@@ -242,10 +232,10 @@ def _auction_item_matches_current_accessory(row: dict[str, Any], item: Equipment
     return all(any(_option_matches(target, option) for option in options) for target in desired)
 
 
-def _auction_prices(items: list[dict[str, Any]], item: EquipmentItem, desired: list[dict[str, Any]]) -> list[float]:
+def _auction_prices(items: list[dict[str, Any]], item: EquipmentItem, desired: list[dict[str, Any]], quality_tolerance: int) -> list[float]:
     prices: list[float] = []
     for row in items:
-        if not _auction_item_matches_current_accessory(row, item, desired):
+        if not _auction_item_matches_current_accessory(row, item, desired, quality_tolerance):
             continue
         value = _auction_buy_price(row)
         if value is not None:
@@ -357,7 +347,7 @@ def _auction_etc_filters(desired: list[dict[str, Any]], auction_options: Any) ->
     return filters
 
 
-def _auction_payload(item: EquipmentItem, part: str, page_no: int = 1, desired: list[dict[str, Any]] | None = None, auction_options: Any = None) -> dict[str, Any]:
+def _auction_payload(item: EquipmentItem, part: str, page_no: int = 1, desired: list[dict[str, Any]] | None = None, auction_options: Any = None, quality_tolerance: int = QUALITY_TOLERANCE_PRIMARY) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "CategoryCode": _auction_category_code(part),
         "ItemName": item.name or "",
@@ -367,23 +357,24 @@ def _auction_payload(item: EquipmentItem, part: str, page_no: int = 1, desired: 
         "Sort": "BUY_PRICE",
         "SortCondition": "ASC",
     }
-    quality_floor = _quality_floor(item.quality)
-    if quality_floor > 0:
-        payload["ItemGradeQuality"] = quality_floor
+    quality_min = _quality_min_for_tolerance(item.quality, quality_tolerance)
+    if quality_min > 0:
+        payload["ItemGradeQuality"] = quality_min
     filters = _auction_etc_filters(desired or [], auction_options)
     if filters:
         payload["EtcOptions"] = filters
     return payload
 
 
-def _search_cache_key(item: EquipmentItem, part: str, request_label: str, etc_filters: list[dict[str, Any]]) -> tuple[Any, ...]:
+def _search_cache_key(item: EquipmentItem, part: str, request_label: str, etc_filters: list[dict[str, Any]], quality_tolerance: int) -> tuple[Any, ...]:
     return (
         request_label,
         _auction_category_code(part),
         item.name or "",
         item.grade or "고대",
         4,
-        _quality_floor(item.quality),
+        _quality_min_for_tolerance(item.quality, quality_tolerance),
+        quality_tolerance,
         tuple((row.get("FirstOption"), row.get("SecondOption"), row.get("MinValue"), row.get("MaxValue")) for row in etc_filters),
     )
 
@@ -412,15 +403,16 @@ def _search_auction_pages(
     desired: list[dict[str, Any]],
     auction_options: Any,
     search_cache: dict[tuple[Any, ...], list[dict[str, Any]]],
+    quality_tolerance: int,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     etc_filters = _auction_etc_filters(desired, auction_options)
-    cache_key = _search_cache_key(item, part, request_label, etc_filters)
+    cache_key = _search_cache_key(item, part, request_label, etc_filters, quality_tolerance)
     if cache_key in search_cache:
         return search_cache[cache_key], etc_filters
 
     rows: list[dict[str, Any]] = []
     for page_no in range(1, AUCTION_PAGE_LIMIT + 1):
-        payload = _auction_payload(item, part, page_no, desired, auction_options)
+        payload = _auction_payload(item, part, page_no, desired, auction_options, quality_tolerance)
         data = client.search_auction_items(payload, optional=True)
         page_items = _auction_items(data)
         if not page_items:
@@ -428,6 +420,32 @@ def _search_auction_pages(
         rows.extend(page_items)
     search_cache[cache_key] = rows
     return rows, etc_filters
+
+
+def _quality_attempt_debug(
+    item: EquipmentItem,
+    request_label: str,
+    cache_key: tuple[Any, ...],
+    desired: list[dict[str, Any]],
+    etc_filters: list[dict[str, Any]],
+    raw_items: list[dict[str, Any]],
+    quality_tolerance: int,
+    auction_options: Any,
+) -> dict[str, Any]:
+    return {
+        "requestLabel": request_label,
+        "rawItemCount": len(raw_items),
+        "pageLimit": AUCTION_PAGE_LIMIT,
+        "qualityTolerance": quality_tolerance,
+        "qualityMin": _quality_min_for_tolerance(item.quality, quality_tolerance),
+        "qualityRange": [max(0, int(item.quality or 0) - quality_tolerance), min(100, int(item.quality or 0) + quality_tolerance)] if item.quality is not None else None,
+        "qualityFallback": quality_tolerance > QUALITY_TOLERANCE_PRIMARY,
+        "cacheKey": list(cache_key),
+        "desiredOptions": [row.get("raw") for row in desired],
+        "auctionEtcOptions": etc_filters,
+        "auctionEtcOptionsResolved": len(etc_filters) == len(desired),
+        "auctionOptionsEndpointLoaded": isinstance(auction_options, dict),
+    }
 
 
 def _auction_estimate(
@@ -445,41 +463,36 @@ def _auction_estimate(
         return _failed_estimate("경매장 인증 설정이 없어 조회하지 못했습니다.", "auction_missing_auth")
     if search_cache is None:
         search_cache = {}
-    try:
-        raw_items, etc_filters = _search_auction_pages(client, item, part, request_label, desired, auction_options, search_cache)
-    except Exception:
-        return _failed_estimate("경매장 요청에 실패했습니다.", "auction_request_failed")
-    cache_key = _search_cache_key(item, part, request_label, etc_filters)
-    debug = {
-        "requestLabel": request_label,
-        "rawItemCount": len(raw_items),
-        "pageLimit": AUCTION_PAGE_LIMIT,
-        "qualityFloor": _quality_floor(item.quality),
-        "cacheKey": list(cache_key),
-        "desiredOptions": [row.get("raw") for row in desired],
-        "auctionEtcOptions": etc_filters,
-        "auctionEtcOptionsResolved": len(etc_filters) == len(desired),
-        "auctionOptionsEndpointLoaded": isinstance(auction_options, dict),
-    }
-    if not raw_items:
-        return _failed_estimate("최근 매물 없음", "auction_recent_listing_not_found", debug)
-    prices = _auction_prices(raw_items, item, desired)
-    if not prices:
-        return _failed_estimate("최근 매물 없음", "auction_recent_listing_not_found", debug)
-    median = prices[len(prices) // 2]
-    q25 = prices[max(0, len(prices) // 4)]
-    q75 = prices[min(len(prices) - 1, (len(prices) * 3) // 4)]
-    return {
-        "minGold": _gold(prices[0]),
-        "q25Gold": _gold(q25),
-        "medianGold": _gold(median),
-        "q75Gold": _gold(q75),
-        "sampleCount": len(prices),
-        "sampleType": "lostark_auction_api_with_etc_options",
-        "status": "ok",
-        "failureReason": None,
-        "debug": debug,
-    }
+
+    last_debug: dict[str, Any] | None = None
+    for quality_tolerance in (QUALITY_TOLERANCE_PRIMARY, QUALITY_TOLERANCE_FALLBACK):
+        try:
+            raw_items, etc_filters = _search_auction_pages(client, item, part, request_label, desired, auction_options, search_cache, quality_tolerance)
+        except Exception:
+            return _failed_estimate("경매장 요청에 실패했습니다.", "auction_request_failed")
+        cache_key = _search_cache_key(item, part, request_label, etc_filters, quality_tolerance)
+        debug = _quality_attempt_debug(item, request_label, cache_key, desired, etc_filters, raw_items, quality_tolerance, auction_options)
+        last_debug = debug
+        prices = _auction_prices(raw_items, item, desired, quality_tolerance)
+        if not prices:
+            continue
+        median = prices[len(prices) // 2]
+        q25 = prices[max(0, len(prices) // 4)]
+        q75 = prices[min(len(prices) - 1, (len(prices) * 3) // 4)]
+        return {
+            "minGold": _gold(prices[0]),
+            "q25Gold": _gold(q25),
+            "medianGold": _gold(median),
+            "q75Gold": _gold(q75),
+            "sampleCount": len(prices),
+            "sampleType": "lostark_auction_api_with_etc_options_quality_fallback" if quality_tolerance > QUALITY_TOLERANCE_PRIMARY else "lostark_auction_api_with_etc_options_quality_primary",
+            "status": "ok",
+            "failureReason": None,
+            "warning": "품질 ±10 보조 참고가" if quality_tolerance > QUALITY_TOLERANCE_PRIMARY else None,
+            "debug": debug,
+        }
+
+    return _failed_estimate("최근 매물 없음", "auction_recent_listing_not_found", last_debug)
 
 
 def _accessory_item(
@@ -497,6 +510,7 @@ def _accessory_item(
     secondary = sum(1 for row in targets if row.get("isSecondary"))
     estimate = _auction_estimate(client, auction_options, item, part, request_label, search_cache)
     ok = estimate.get("status") == "ok"
+    estimate_warning = estimate.get("warning")
     return {
         "slot": item.slot,
         "marketRequestLabel": request_label,
@@ -517,11 +531,13 @@ def _accessory_item(
             "grade": item.grade or "등급 미상",
             "tier": "T4 추정",
             "qualityBand": _quality_band(item.quality),
+            "primaryQualityTolerance": QUALITY_TOLERANCE_PRIMARY,
+            "fallbackQualityTolerance": QUALITY_TOLERANCE_FALLBACK,
             "coreEffectCount": core,
             "validEffectCount": len(targets),
         },
         "basis": "lostark_auction_api_with_etc_options" if ok else "lostark_auction_api_failed_no_fallback",
-        "warning": None if ok else estimate.get("failureReason"),
+        "warning": estimate_warning if ok and estimate_warning else (None if ok else estimate.get("failureReason")),
     }
 
 
@@ -624,8 +640,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     bracelet_cost = bracelet.get("estimatedActualCostGold") or bracelet.get("expectedReproductionCostGold") or 0
     accessory_median = total.get("medianGold")
     return {
-        "version": "v60.12-auction-etc-options-payload",
-        "source": "lostark_auction_api_etc_options_payload_no_fallback",
+        "version": "v60.13-auction-quality-tolerance-fallback",
+        "source": "lostark_auction_api_etc_options_quality_tolerance_no_fallback",
         "tradeApiConnected": all_prices_ok,
         "auctionApiConnected": connected_count > 0,
         "summary": {
@@ -637,8 +653,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
         "accessoryMarket": {
             "items": items,
             "total": total,
-            "conditions": ["목걸이", "귀걸이1", "귀걸이2", "반지1", "반지2", "각 장착 장신구별 별도 API 스캔", "EtcOptions 요청 필터", f"상위 {AUCTION_PAGE_LIMIT}페이지"],
-            "basis": "각 장착 장신구별로 /auctions/options에서 찾은 EtcOptions 코드를 /auctions/items 요청 payload에 넣어 검색합니다. 이후 응답 Options와 BuyPrice를 한 번 더 검증합니다.",
+            "conditions": ["목걸이", "귀걸이1", "귀걸이2", "반지1", "반지2", "EtcOptions 요청 필터", "기본 품질 ±5", "실패 시 품질 ±10 보조", f"상위 {AUCTION_PAGE_LIMIT}페이지"],
+            "basis": "각 장착 장신구별로 EtcOptions를 넣어 검색하고, 본 시장가는 현재 품질 ±5 범위에서 먼저 찾습니다. 없을 때만 ±10 범위를 보조 참고가로 사용합니다.",
         },
         "braceletMarket": bracelet,
         "separationRule": {
@@ -646,10 +662,11 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
             "luck": "운 판정은 장기백, 스톤 시도 수, 장신구 직접 연마 시도 수, 팔찌 랜덤 옵션 시도 수로 따로 봅니다.",
         },
         "limits": [
+            "본 시장가는 현재 품질 ±5 범위 매물을 우선 사용합니다.",
+            "±5 범위에서 매칭 매물이 없을 때만 현재 품질 ±10 범위를 보조 참고가로 사용합니다.",
+            "±10 보조 매물로 산정된 항목은 품질 ±10 보조 참고가로 표시합니다.",
             "장신구 핵심 옵션은 /auctions/items 요청의 EtcOptions에 포함해 검색합니다.",
-            "EtcOptions 코드 매핑은 /auctions/options 응답을 동적으로 해석해 만듭니다.",
             "응답 Options와 현재 장신구 옵션을 후처리로 한 번 더 검증합니다.",
-            f"각 장착 장신구는 별도 요청 라벨로 경매장 상위 {AUCTION_PAGE_LIMIT}페이지를 스캔합니다.",
             "조건에 맞는 매물이 없으면 장신구 시장가는 최근 매물 없음으로 표시합니다.",
             "입찰가, 시작가, 옵션 불일치 매물 가격은 시장 재현 비용으로 사용하지 않습니다.",
             "팔찌 가격은 후속 연동 대상입니다.",
