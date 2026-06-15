@@ -72,6 +72,20 @@ def _quality_band(q: int | None) -> str:
     return "70 미만"
 
 
+def _quality_floor(q: int | None) -> int:
+    if q is None:
+        return 0
+    if q >= 95:
+        return 95
+    if q >= 90:
+        return 90
+    if q >= 80:
+        return 80
+    if q >= 70:
+        return 70
+    return 0
+
+
 def _quality_band_key(q: int | None) -> str:
     return _quality_band(q)
 
@@ -123,9 +137,52 @@ def _desired_option_from_effect(effect: str) -> dict[str, Any] | None:
     return None
 
 
+def _desired_priority(part: str, option: dict[str, Any]) -> int:
+    name = str(option.get("name") or "")
+    is_percent = bool(option.get("isPercent"))
+    if part == "necklace":
+        if name == "추가 피해":
+            return 1
+        if name == "적에게 주는 피해":
+            return 2
+        if name == "낙인력":
+            return 3
+        if name in {"세레나데", "신앙", "조화 게이지"}:
+            return 4
+        if name == "무기 공격력":
+            return 5
+        if name == "공격력":
+            return 6
+    if part == "earring":
+        if name == "무기 공격력" and is_percent:
+            return 1
+        if name == "공격력" and is_percent:
+            return 2
+        if name == "무기 공격력":
+            return 5
+        if name == "공격력":
+            return 6
+    if part == "ring":
+        if name == "치명타 피해":
+            return 1
+        if name == "치명타 적중률":
+            return 2
+        if name == "아군 공격력 강화 효과":
+            return 3
+        if name == "아군 피해량 강화 효과":
+            return 4
+        if name == "무기 공격력":
+            return 5
+        if name == "공격력":
+            return 6
+    return 99
+
+
 def _desired_options(item: EquipmentItem) -> list[dict[str, Any]]:
     effects = item.accessory_effects or []
     rows = [row for row in (_desired_option_from_effect(str(effect)) for effect in effects) if row]
+    part = _part(item.slot)
+    rows = sorted(rows, key=lambda row: (_desired_priority(part, row), -float(row.get("value") or 0)))
     return rows[:2]
 
 
@@ -197,13 +254,19 @@ def _auction_prices(items: list[dict[str, Any]], item: EquipmentItem, desired: l
 
 
 def _auction_payload(item: EquipmentItem, part: str, page_no: int = 1) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "CategoryCode": _auction_category_code(part),
         "ItemName": item.name or "",
+        "ItemGrade": item.grade or "고대",
+        "ItemTier": 4,
         "PageNo": page_no,
         "Sort": "BUY_PRICE",
         "SortCondition": "ASC",
     }
+    quality_floor = _quality_floor(item.quality)
+    if quality_floor > 0:
+        payload["ItemGradeQuality"] = quality_floor
+    return payload
 
 
 def _failed_estimate(reason: str, sample_type: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -248,14 +311,14 @@ def _auction_estimate(item: EquipmentItem, part: str) -> dict[str, Any]:
         return _failed_estimate(
             "경매장 응답에 매물이 없습니다.",
             "auction_empty_response",
-            {"pageLimit": AUCTION_PAGE_LIMIT, "desiredOptions": [row.get("raw") for row in desired]},
+            {"pageLimit": AUCTION_PAGE_LIMIT, "qualityFloor": _quality_floor(item.quality), "desiredOptions": [row.get("raw") for row in desired]},
         )
     prices = _auction_prices(raw_items, item, desired)
     if not prices:
         return _failed_estimate(
             f"첫 {AUCTION_PAGE_LIMIT}페이지에서 현재 핵심 옵션과 품질 구간이 맞는 즉시 구매 매물을 찾지 못했습니다.",
             "auction_no_matching_buy_listing",
-            {"rawItemCount": len(raw_items), "pageLimit": AUCTION_PAGE_LIMIT, "desiredOptions": [row.get("raw") for row in desired]},
+            {"rawItemCount": len(raw_items), "pageLimit": AUCTION_PAGE_LIMIT, "qualityFloor": _quality_floor(item.quality), "desiredOptions": [row.get("raw") for row in desired]},
         )
     median = prices[len(prices) // 2]
     q25 = prices[max(0, len(prices) // 4)]
@@ -375,7 +438,7 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     bracelet_cost = bracelet.get("estimatedActualCostGold") or bracelet.get("expectedReproductionCostGold") or 0
     accessory_median = total.get("medianGold")
     return {
-        "version": "v60.8-auction-accessory-paged-options",
+        "version": "v60.9-auction-prioritized-options-quality-floor",
         "source": "lostark_auction_api_options_filtered_paged_no_fallback",
         "tradeApiConnected": all_prices_ok,
         "auctionApiConnected": connected_count > 0,
@@ -388,8 +451,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
         "accessoryMarket": {
             "items": items,
             "total": total,
-            "conditions": ["부위", "등급", "품질 구간", "아이템명", "핵심 Options 후처리", f"상위 {AUCTION_PAGE_LIMIT}페이지"],
-            "basis": "경매장을 이름/카테고리 기준으로 여러 페이지 조회한 뒤, 응답 Options가 현재 장신구 핵심 옵션과 일치하고 품질 구간이 같은 즉시 구매 매물만 사용합니다.",
+            "conditions": ["부위", "등급", "품질 구간", "아이템명", "가격 우선 핵심 Options", f"상위 {AUCTION_PAGE_LIMIT}페이지"],
+            "basis": "경매장을 품질 구간 하한과 이름/카테고리 기준으로 조회한 뒤, 가격 우선 핵심 옵션이 일치하는 즉시 구매 매물만 사용합니다.",
         },
         "braceletMarket": bracelet,
         "separationRule": {
@@ -397,8 +460,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
             "luck": "운 판정은 장기백, 스톤 시도 수, 장신구 직접 연마 시도 수, 팔찌 랜덤 옵션 시도 수로 따로 봅니다.",
         },
         "limits": [
-            f"장신구는 경매장 상위 {AUCTION_PAGE_LIMIT}페이지 응답 중 현재 장신구 핵심 옵션과 일치하는 즉시 구매 매물만 사용합니다.",
-            "품질은 정확히 같은 숫자가 아니라 같은 품질 구간으로 비교합니다.",
+            f"장신구는 경매장 상위 {AUCTION_PAGE_LIMIT}페이지 응답 중 가격 우선 핵심 옵션과 일치하는 즉시 구매 매물만 사용합니다.",
+            "품질은 검색 payload에는 구간 하한을 넣고, 후처리에서는 같은 품질 구간으로 비교합니다.",
             "조건에 맞는 매물이 없으면 장신구 시장가는 조회 실패로 표시합니다.",
             "입찰가, 시작가, 옵션 불일치 매물 가격은 시장 재현 비용으로 사용하지 않습니다.",
             "팔찌 가격은 후속 연동 대상입니다.",
