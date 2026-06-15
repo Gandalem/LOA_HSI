@@ -7,6 +7,8 @@ from app.core.settings import get_settings
 from app.models.schemas import CharacterSummary, EquipmentItem
 from app.services.lostark_client import LostArkClient
 
+AUCTION_PAGE_LIMIT = 10
+
 
 def _n(value: Any, default: float = 0.0) -> float:
     try:
@@ -101,8 +103,6 @@ def _desired_option_from_effect(effect: str) -> dict[str, Any] | None:
     value = _first_number(text)
     if value is None:
         return None
-    # 가격 산정은 주 유효 연마 옵션 기준으로만 맞춥니다.
-    # 최대 마나/생명력 같은 보조 옵션까지 exact match하면 실제 매물이 거의 잡히지 않습니다.
     names = [
         "적에게 주는 피해",
         "추가 피해",
@@ -126,7 +126,6 @@ def _desired_option_from_effect(effect: str) -> dict[str, Any] | None:
 def _desired_options(item: EquipmentItem) -> list[dict[str, Any]]:
     effects = item.accessory_effects or []
     rows = [row for row in (_desired_option_from_effect(str(effect)) for effect in effects) if row]
-    # 최대 2개의 주 옵션만 가격 매칭에 사용합니다. 구매 시장가는 핵심 옵션 일치가 우선입니다.
     return rows[:2]
 
 
@@ -186,9 +185,9 @@ def _auction_item_matches_current_accessory(row: dict[str, Any], item: Equipment
     return all(any(_option_matches(target, option) for option in options) for target in desired)
 
 
-def _auction_prices(data: Any, item: EquipmentItem, desired: list[dict[str, Any]]) -> list[float]:
+def _auction_prices(items: list[dict[str, Any]], item: EquipmentItem, desired: list[dict[str, Any]]) -> list[float]:
     prices: list[float] = []
-    for row in _auction_items(data):
+    for row in items:
         if not _auction_item_matches_current_accessory(row, item, desired):
             continue
         value = _auction_buy_price(row)
@@ -197,18 +196,18 @@ def _auction_prices(data: Any, item: EquipmentItem, desired: list[dict[str, Any]
     return sorted(prices)
 
 
-def _auction_payload(item: EquipmentItem, part: str) -> dict[str, Any]:
+def _auction_payload(item: EquipmentItem, part: str, page_no: int = 1) -> dict[str, Any]:
     return {
         "CategoryCode": _auction_category_code(part),
         "ItemName": item.name or "",
-        "PageNo": 1,
+        "PageNo": page_no,
         "Sort": "BUY_PRICE",
         "SortCondition": "ASC",
     }
 
 
-def _failed_estimate(reason: str, sample_type: str) -> dict[str, Any]:
-    return {
+def _failed_estimate(reason: str, sample_type: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
+    result = {
         "minGold": None,
         "q25Gold": None,
         "medianGold": None,
@@ -218,6 +217,20 @@ def _failed_estimate(reason: str, sample_type: str) -> dict[str, Any]:
         "status": "failed",
         "failureReason": reason,
     }
+    if details:
+        result["debug"] = details
+    return result
+
+
+def _search_auction_pages(client: LostArkClient, item: EquipmentItem, part: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for page_no in range(1, AUCTION_PAGE_LIMIT + 1):
+        data = client.search_auction_items(_auction_payload(item, part, page_no), optional=True)
+        page_items = _auction_items(data)
+        if not page_items:
+            break
+        rows.extend(page_items)
+    return rows
 
 
 def _auction_estimate(item: EquipmentItem, part: str) -> dict[str, Any]:
@@ -227,14 +240,23 @@ def _auction_estimate(item: EquipmentItem, part: str) -> dict[str, Any]:
     if not get_settings().lostark_api_key:
         return _failed_estimate("경매장 인증 설정이 없어 조회하지 못했습니다.", "auction_missing_auth")
     try:
-        data = LostArkClient().search_auction_items(_auction_payload(item, part), optional=True)
+        client = LostArkClient()
+        raw_items = _search_auction_pages(client, item, part)
     except Exception:
         return _failed_estimate("경매장 요청에 실패했습니다.", "auction_request_failed")
-    if data is None:
-        return _failed_estimate("경매장 응답이 비어 있습니다.", "auction_empty_response")
-    prices = _auction_prices(data, item, desired)
+    if not raw_items:
+        return _failed_estimate(
+            "경매장 응답에 매물이 없습니다.",
+            "auction_empty_response",
+            {"pageLimit": AUCTION_PAGE_LIMIT, "desiredOptions": [row.get("raw") for row in desired]},
+        )
+    prices = _auction_prices(raw_items, item, desired)
     if not prices:
-        return _failed_estimate("현재 핵심 옵션과 품질 구간이 맞는 즉시 구매 매물이 없습니다.", "auction_no_matching_buy_listing")
+        return _failed_estimate(
+            f"첫 {AUCTION_PAGE_LIMIT}페이지에서 현재 핵심 옵션과 품질 구간이 맞는 즉시 구매 매물을 찾지 못했습니다.",
+            "auction_no_matching_buy_listing",
+            {"rawItemCount": len(raw_items), "pageLimit": AUCTION_PAGE_LIMIT, "desiredOptions": [row.get("raw") for row in desired]},
+        )
     median = prices[len(prices) // 2]
     q25 = prices[max(0, len(prices) // 4)]
     q75 = prices[min(len(prices) - 1, (len(prices) * 3) // 4)]
@@ -244,7 +266,7 @@ def _auction_estimate(item: EquipmentItem, part: str) -> dict[str, Any]:
         "medianGold": _gold(median),
         "q75Gold": _gold(q75),
         "sampleCount": len(prices),
-        "sampleType": "lostark_auction_api_options_filtered",
+        "sampleType": "lostark_auction_api_options_filtered_paged",
         "status": "ok",
         "failureReason": None,
     }
@@ -353,8 +375,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     bracelet_cost = bracelet.get("estimatedActualCostGold") or bracelet.get("expectedReproductionCostGold") or 0
     accessory_median = total.get("medianGold")
     return {
-        "version": "v60.7-auction-accessory-options-quality-band",
-        "source": "lostark_auction_api_options_filtered_no_fallback",
+        "version": "v60.8-auction-accessory-paged-options",
+        "source": "lostark_auction_api_options_filtered_paged_no_fallback",
         "tradeApiConnected": all_prices_ok,
         "auctionApiConnected": connected_count > 0,
         "summary": {
@@ -366,8 +388,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
         "accessoryMarket": {
             "items": items,
             "total": total,
-            "conditions": ["부위", "등급", "품질 구간", "아이템명", "핵심 Options 후처리"],
-            "basis": "경매장을 이름/카테고리 기준으로 조회한 뒤, 응답 Options가 현재 장신구 핵심 옵션과 일치하고 품질 구간이 같은 즉시 구매 매물만 사용합니다.",
+            "conditions": ["부위", "등급", "품질 구간", "아이템명", "핵심 Options 후처리", f"상위 {AUCTION_PAGE_LIMIT}페이지"],
+            "basis": "경매장을 이름/카테고리 기준으로 여러 페이지 조회한 뒤, 응답 Options가 현재 장신구 핵심 옵션과 일치하고 품질 구간이 같은 즉시 구매 매물만 사용합니다.",
         },
         "braceletMarket": bracelet,
         "separationRule": {
@@ -375,7 +397,7 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
             "luck": "운 판정은 장기백, 스톤 시도 수, 장신구 직접 연마 시도 수, 팔찌 랜덤 옵션 시도 수로 따로 봅니다.",
         },
         "limits": [
-            "장신구는 경매장 응답 Options가 현재 장신구 핵심 옵션과 일치하는 즉시 구매 매물만 사용합니다.",
+            f"장신구는 경매장 상위 {AUCTION_PAGE_LIMIT}페이지 응답 중 현재 장신구 핵심 옵션과 일치하는 즉시 구매 매물만 사용합니다.",
             "품질은 정확히 같은 숫자가 아니라 같은 품질 구간으로 비교합니다.",
             "조건에 맞는 매물이 없으면 장신구 시장가는 조회 실패로 표시합니다.",
             "입찰가, 시작가, 옵션 불일치 매물 가격은 시장 재현 비용으로 사용하지 않습니다.",
