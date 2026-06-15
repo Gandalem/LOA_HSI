@@ -84,6 +84,16 @@ def _quality_range(q: int | None) -> list[int] | None:
     return [max(0, int(q) - QUALITY_TOLERANCE), min(100, int(q) + QUALITY_TOLERANCE)]
 
 
+def _quality_in_tolerance(row: dict[str, Any], quality: int | None) -> bool:
+    if quality is None:
+        return True
+    raw = row.get("GradeQuality") if "GradeQuality" in row else row.get("gradeQuality")
+    try:
+        return abs(int(raw) - int(quality)) <= QUALITY_TOLERANCE
+    except Exception:
+        return False
+
+
 def _auction_items(data: Any) -> list[dict[str, Any]]:
     if isinstance(data, dict):
         items = data.get("Items") or data.get("items")
@@ -614,7 +624,7 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     bracelet_cost = bracelet.get("estimatedActualCostGold") or bracelet.get("expectedReproductionCostGold") or 0
     accessory_median = total.get("medianGold")
     return {
-        "version": "v60.17-auction-verified-options-only",
+        "version": "v60.18-auction-quality-helper-fix",
         "source": "lostark_auction_api_verified_response_options_only",
         "tradeApiConnected": all_prices_ok,
         "auctionApiConnected": connected_count > 0,
