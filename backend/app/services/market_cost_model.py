@@ -7,17 +7,14 @@ from app.core.settings import get_settings
 from app.models.schemas import CharacterSummary, EquipmentItem
 from app.services.lostark_client import LostArkClient
 
-# 핵심 옵션을 EtcOptions로 검색하므로 호출 수는 낮게 유지합니다.
-# 기준: 4티어 고대 / 핵심 옵션 2개 / 품질 ±10 / 이름 무관 / 부위별.
 AUCTION_PAGE_LIMIT = 5
 QUALITY_TOLERANCE = 10
+SEARCH_CRITERIA_LABEL = "4티어 고대 / 핵심 옵션 2개 / 품질 ±10 / 이름 무관 / 부위별"
 
 
 def _n(value: Any, default: float = 0.0) -> float:
     try:
-        if value is None:
-            return default
-        return float(value)
+        return default if value is None else float(value)
     except Exception:
         return default
 
@@ -75,16 +72,16 @@ def _quality_band(q: int | None) -> str:
     return "70 미만"
 
 
-def _quality_min_for_tolerance(q: int | None, tolerance: int = QUALITY_TOLERANCE) -> int:
+def _quality_min(q: int | None) -> int:
     if q is None:
         return 0
-    return max(0, min(100, int(q) - int(tolerance)))
+    return max(0, min(100, int(q) - QUALITY_TOLERANCE))
 
 
-def _quality_range(q: int | None, tolerance: int = QUALITY_TOLERANCE) -> list[int] | None:
+def _quality_range(q: int | None) -> list[int] | None:
     if q is None:
         return None
-    return [max(0, int(q) - int(tolerance)), min(100, int(q) + int(tolerance))]
+    return [max(0, int(q) - QUALITY_TOLERANCE), min(100, int(q) + QUALITY_TOLERANCE)]
 
 
 def _auction_items(data: Any) -> list[dict[str, Any]]:
@@ -96,12 +93,8 @@ def _auction_items(data: Any) -> list[dict[str, Any]]:
     return []
 
 
-def _normalize_name(value: Any) -> str:
-    text = str(value or "")
-    text = text.replace(" ", "")
-    text = text.replace("%", "")
-    text = text.replace("+", "")
-    return text.lower()
+def _normalize(value: Any) -> str:
+    return str(value or "").replace(" ", "").replace("%", "").replace("+", "").lower()
 
 
 def _first_number(text: str) -> float | None:
@@ -134,22 +127,12 @@ def _desired_option_from_effect(effect: str) -> dict[str, Any] | None:
     return None
 
 
-def _desired_priority(part: str, option: dict[str, Any]) -> int:
-    name = str(option.get("name") or "")
-    is_percent = bool(option.get("isPercent"))
+def _desired_priority(part: str, row: dict[str, Any]) -> int:
+    name = str(row.get("name") or "")
+    is_percent = bool(row.get("isPercent"))
     if part == "necklace":
-        if name == "추가 피해":
-            return 1
-        if name == "적에게 주는 피해":
-            return 2
-        if name == "낙인력":
-            return 3
-        if name in {"세레나데", "신앙", "조화 게이지"}:
-            return 4
-        if name == "무기 공격력":
-            return 5
-        if name == "공격력":
-            return 6
+        order = ["추가 피해", "적에게 주는 피해", "낙인력", "세레나데", "신앙", "조화 게이지", "무기 공격력", "공격력"]
+        return order.index(name) + 1 if name in order else 99
     if part == "earring":
         if name == "무기 공격력" and is_percent:
             return 1
@@ -160,69 +143,16 @@ def _desired_priority(part: str, option: dict[str, Any]) -> int:
         if name == "공격력":
             return 6
     if part == "ring":
-        if name == "치명타 피해":
-            return 1
-        if name == "치명타 적중률":
-            return 2
-        if name == "아군 공격력 강화 효과":
-            return 3
-        if name == "아군 피해량 강화 효과":
-            return 4
-        if name == "무기 공격력":
-            return 5
-        if name == "공격력":
-            return 6
+        order = ["치명타 피해", "치명타 적중률", "아군 공격력 강화 효과", "아군 피해량 강화 효과", "무기 공격력", "공격력"]
+        return order.index(name) + 1 if name in order else 99
     return 99
 
 
 def _desired_options(item: EquipmentItem) -> list[dict[str, Any]]:
-    effects = item.accessory_effects or []
-    rows = [row for row in (_desired_option_from_effect(str(effect)) for effect in effects) if row]
+    rows = [row for row in (_desired_option_from_effect(str(effect)) for effect in (item.accessory_effects or [])) if row]
     part = _part(item.slot)
     rows = sorted(rows, key=lambda row: (_desired_priority(part, row), -float(row.get("value") or 0)))
     return rows[:2]
-
-
-def _auction_buy_price(row: dict[str, Any]) -> float | None:
-    info = row.get("AuctionInfo") or row.get("auctionInfo") or {}
-    if not isinstance(info, dict):
-        return None
-    value = info.get("BuyPrice") if "BuyPrice" in info else info.get("buyPrice")
-    try:
-        parsed = float(value)
-        return parsed if parsed > 0 else None
-    except Exception:
-        return None
-
-
-def _quality_in_tolerance(row: dict[str, Any], quality: int | None, tolerance: int = QUALITY_TOLERANCE) -> bool:
-    if quality is None:
-        return True
-    raw = row.get("GradeQuality") if "GradeQuality" in row else row.get("gradeQuality")
-    try:
-        return abs(int(raw) - int(quality)) <= int(tolerance)
-    except Exception:
-        return False
-
-
-def _basic_listing_matches(row: dict[str, Any], item: EquipmentItem) -> bool:
-    # 이름은 시장가 기준에서 제외합니다. 같은 부위/등급/티어/옵션/품질 범위면 비교 대상으로 봅니다.
-    if item.grade and str(row.get("Grade") or row.get("grade") or "") != str(item.grade):
-        return False
-    if not _quality_in_tolerance(row, item.quality, QUALITY_TOLERANCE):
-        return False
-    return True
-
-
-def _auction_prices(items: list[dict[str, Any]], item: EquipmentItem) -> list[float]:
-    prices: list[float] = []
-    for row in items:
-        if not _basic_listing_matches(row, item):
-            continue
-        value = _auction_buy_price(row)
-        if value is not None:
-            prices.append(float(value))
-    return sorted(prices)
 
 
 def _option_code(row: dict[str, Any]) -> int | None:
@@ -257,7 +187,7 @@ def _auction_etc_option_candidates(auction_options: Any) -> list[dict[str, Any]]
     groups = auction_options.get("EtcOptions") or auction_options.get("etcOptions") or []
     if not isinstance(groups, list):
         return []
-    candidates: list[dict[str, Any]] = []
+    result: list[dict[str, Any]] = []
     for parent in groups:
         if not isinstance(parent, dict):
             continue
@@ -270,16 +200,20 @@ def _auction_etc_option_candidates(auction_options: Any) -> list[dict[str, Any]]
             child_text = _option_text(child)
             if second is None:
                 continue
-            text = f"{parent_text} {child_text}".strip()
-            candidates.append({"FirstOption": first, "SecondOption": second, "text": text, "parentText": parent_text, "childText": child_text})
-    return candidates
+            result.append({
+                "FirstOption": first,
+                "SecondOption": second,
+                "text": f"{parent_text} {child_text}".strip(),
+                "childText": child_text,
+            })
+    return result
 
 
 def _auction_filter_score(desired: dict[str, Any], candidate: dict[str, Any]) -> int:
     desired_name = str(desired.get("name") or "")
-    desired_norm = _normalize_name(desired_name)
+    desired_norm = _normalize(desired_name)
     text = str(candidate.get("text") or "")
-    text_norm = _normalize_name(text)
+    text_norm = _normalize(text)
     if not desired_norm:
         return 0
     if desired_name == "공격력" and "무기공격력" in text_norm:
@@ -289,7 +223,7 @@ def _auction_filter_score(desired: dict[str, Any], candidate: dict[str, Any]) ->
     if desired_norm not in text_norm and text_norm not in desired_norm:
         return 0
     score = 100
-    if desired_norm == text_norm or desired_norm == _normalize_name(candidate.get("childText")):
+    if desired_norm == text_norm or desired_norm == _normalize(candidate.get("childText")):
         score += 40
     is_percent = bool(desired.get("isPercent"))
     if is_percent and ("%" in text or "비율" in text or "퍼센트" in text):
@@ -304,9 +238,8 @@ def _auction_filter_score(desired: dict[str, Any], candidate: dict[str, Any]) ->
 
 
 def _auction_etc_filter_for_desired(desired: dict[str, Any], auction_options: Any) -> dict[str, Any] | None:
-    candidates = _auction_etc_option_candidates(auction_options)
-    scored = [(candidate, _auction_filter_score(desired, candidate)) for candidate in candidates]
-    scored = [(candidate, score) for candidate, score in scored if score > 0]
+    scored = [(row, _auction_filter_score(desired, row)) for row in _auction_etc_option_candidates(auction_options)]
+    scored = [(row, score) for row, score in scored if score > 0]
     if not scored:
         return None
     candidate = sorted(scored, key=lambda row: row[1], reverse=True)[0][0]
@@ -320,15 +253,15 @@ def _auction_etc_filter_for_desired(desired: dict[str, Any], auction_options: An
 
 
 def _auction_etc_filters(desired: list[dict[str, Any]], auction_options: Any) -> list[dict[str, Any]]:
-    filters: list[dict[str, Any]] = []
-    for row in desired:
-        resolved = _auction_etc_filter_for_desired(row, auction_options)
+    rows: list[dict[str, Any]] = []
+    for desired_row in desired:
+        resolved = _auction_etc_filter_for_desired(desired_row, auction_options)
         if resolved:
-            filters.append(resolved)
-    return filters
+            rows.append(resolved)
+    return rows
 
 
-def _auction_payload(item: EquipmentItem, part: str, page_no: int = 1, desired: list[dict[str, Any]] | None = None, auction_options: Any = None) -> dict[str, Any]:
+def _auction_payload(item: EquipmentItem, part: str, page_no: int, desired: list[dict[str, Any]], auction_options: Any) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "CategoryCode": _auction_category_code(part),
         "ItemGrade": item.grade or "고대",
@@ -337,24 +270,110 @@ def _auction_payload(item: EquipmentItem, part: str, page_no: int = 1, desired: 
         "Sort": "BUY_PRICE",
         "SortCondition": "ASC",
     }
-    quality_min = _quality_min_for_tolerance(item.quality, QUALITY_TOLERANCE)
+    quality_min = _quality_min(item.quality)
     if quality_min > 0:
         payload["ItemGradeQuality"] = quality_min
-    filters = _auction_etc_filters(desired or [], auction_options)
+    filters = _auction_etc_filters(desired, auction_options)
     if filters:
         payload["EtcOptions"] = filters
     return payload
 
 
-def _search_cache_key(item: EquipmentItem, part: str, request_label: str, etc_filters: list[dict[str, Any]]) -> tuple[Any, ...]:
+def _auction_option_rows(row: dict[str, Any]) -> list[dict[str, Any]]:
+    options = row.get("Options") or row.get("options") or []
+    return [option for option in options if isinstance(option, dict)] if isinstance(options, list) else []
+
+
+def _option_matches(desired: dict[str, Any], option: dict[str, Any]) -> bool:
+    name = _normalize(option.get("OptionName") or option.get("optionName") or option.get("Name") or option.get("name"))
+    desired_name = _normalize(desired.get("name"))
+    if not name or (desired_name not in name and name not in desired_name):
+        return False
+    try:
+        value = float(option.get("Value") if "Value" in option else option.get("value"))
+    except Exception:
+        return False
+    if abs(value - float(desired.get("value") or 0)) > 0.001:
+        return False
+    expected_percent = bool(desired.get("isPercent"))
+    actual_percent = bool(option.get("IsValuePercentage") if "IsValuePercentage" in option else option.get("isValuePercentage"))
+    return expected_percent == actual_percent
+
+
+def _listing_matches(row: dict[str, Any], item: EquipmentItem, desired: list[dict[str, Any]]) -> bool:
+    if item.grade and str(row.get("Grade") or row.get("grade") or "") != str(item.grade):
+        return False
+    if not _quality_in_tolerance(row, item.quality):
+        return False
+    options = _auction_option_rows(row)
+    if not options:
+        return False
+    return all(any(_option_matches(target, option) for option in options) for target in desired)
+
+
+def _auction_buy_price(row: dict[str, Any]) -> float | None:
+    info = row.get("AuctionInfo") or row.get("auctionInfo") or {}
+    if not isinstance(info, dict):
+        return None
+    value = info.get("BuyPrice") if "BuyPrice" in info else info.get("buyPrice")
+    try:
+        parsed = float(value)
+        return parsed if parsed > 0 else None
+    except Exception:
+        return None
+
+
+def _auction_prices(items: list[dict[str, Any]], item: EquipmentItem, desired: list[dict[str, Any]]) -> list[float]:
+    prices: list[float] = []
+    for row in items:
+        if not _listing_matches(row, item, desired):
+            continue
+        value = _auction_buy_price(row)
+        if value is not None:
+            prices.append(float(value))
+    return sorted(prices)
+
+
+def _rejection_reason(row: dict[str, Any], item: EquipmentItem, desired: list[dict[str, Any]]) -> str:
+    if item.grade and str(row.get("Grade") or row.get("grade") or "") != str(item.grade):
+        return "등급 불일치"
+    if not _quality_in_tolerance(row, item.quality):
+        return "품질 범위 불일치"
+    options = _auction_option_rows(row)
+    if not options:
+        return "Options 없음"
+    missing = [str(target.get("raw") or target.get("name")) for target in desired if not any(_option_matches(target, option) for option in options)]
+    if missing:
+        return "핵심 옵션 불일치: " + ", ".join(missing)
+    if _auction_buy_price(row) is None:
+        return "BuyPrice 없음"
+    return "통과 가능"
+
+
+def _rejected_samples(raw_items: list[dict[str, Any]], item: EquipmentItem, desired: list[dict[str, Any]], limit: int = 5) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for row in raw_items[:limit]:
+        info = row.get("AuctionInfo") or row.get("auctionInfo") or {}
+        rows.append({
+            "name": row.get("Name") or row.get("name"),
+            "grade": row.get("Grade") or row.get("grade"),
+            "gradeQuality": row.get("GradeQuality") if "GradeQuality" in row else row.get("gradeQuality"),
+            "buyPrice": info.get("BuyPrice") if isinstance(info, dict) else None,
+            "options": _auction_option_rows(row),
+            "reason": _rejection_reason(row, item, desired),
+        })
+    return rows
+
+
+def _search_cache_key(item: EquipmentItem, part: str, request_label: str, filters: list[dict[str, Any]]) -> tuple[Any, ...]:
     return (
         request_label,
         _auction_category_code(part),
         item.grade or "고대",
         4,
-        _quality_min_for_tolerance(item.quality, QUALITY_TOLERANCE),
+        _quality_min(item.quality),
         QUALITY_TOLERANCE,
-        tuple((row.get("FirstOption"), row.get("SecondOption"), row.get("MinValue"), row.get("MaxValue")) for row in etc_filters),
+        tuple((row.get("FirstOption"), row.get("SecondOption"), row.get("MinValue"), row.get("MaxValue")) for row in filters),
     )
 
 
@@ -382,60 +401,51 @@ def _search_auction_pages(
     desired: list[dict[str, Any]],
     auction_options: Any,
     search_cache: dict[tuple[Any, ...], list[dict[str, Any]]],
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    etc_filters = _auction_etc_filters(desired, auction_options)
-    cache_key = _search_cache_key(item, part, request_label, etc_filters)
-    if cache_key in search_cache:
-        return search_cache[cache_key], etc_filters
-
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    filters = _auction_etc_filters(desired, auction_options)
+    key = _search_cache_key(item, part, request_label, filters)
+    if key in search_cache:
+        return search_cache[key], filters, []
     rows: list[dict[str, Any]] = []
+    payloads: list[dict[str, Any]] = []
     for page_no in range(1, AUCTION_PAGE_LIMIT + 1):
         payload = _auction_payload(item, part, page_no, desired, auction_options)
-        data = client.search_auction_items(payload, optional=True)
-        page_items = _auction_items(data)
+        payloads.append(payload)
+        page_items = _auction_items(client.search_auction_items(payload, optional=True))
         if not page_items:
             break
         rows.extend(page_items)
-    search_cache[cache_key] = rows
-    return rows, etc_filters
+    search_cache[key] = rows
+    return rows, filters, payloads
 
 
-def _search_debug(
-    item: EquipmentItem,
-    part: str,
-    request_label: str,
-    cache_key: tuple[Any, ...],
-    desired: list[dict[str, Any]],
-    etc_filters: list[dict[str, Any]],
-    raw_items: list[dict[str, Any]],
-    auction_options: Any,
-) -> dict[str, Any]:
-    return {
+def _search_debug(item: EquipmentItem, part: str, request_label: str, key: tuple[Any, ...], desired: list[dict[str, Any]], filters: list[dict[str, Any]], raw_items: list[dict[str, Any]], payloads: list[dict[str, Any]], auction_options: Any) -> dict[str, Any]:
+    debug = {
         "requestLabel": request_label,
-        "searchCriteriaLabel": "4티어 고대 / 핵심 옵션 2개 / 품질 ±10 / 이름 무관 / 부위별",
+        "searchCriteriaLabel": SEARCH_CRITERIA_LABEL,
         "categoryCode": _auction_category_code(part),
         "itemNameIgnored": True,
         "rawItemCount": len(raw_items),
         "pageLimit": AUCTION_PAGE_LIMIT,
         "qualityTolerance": QUALITY_TOLERANCE,
-        "qualityMin": _quality_min_for_tolerance(item.quality, QUALITY_TOLERANCE),
-        "qualityRange": _quality_range(item.quality, QUALITY_TOLERANCE),
-        "cacheKey": list(cache_key),
+        "qualityMin": _quality_min(item.quality),
+        "qualityRange": _quality_range(item.quality),
+        "strictOptionsOnly": True,
+        "priceFloorApplied": False,
+        "cacheKey": list(key),
         "desiredOptions": [row.get("raw") for row in desired],
-        "auctionEtcOptions": etc_filters,
-        "auctionEtcOptionsResolved": len(etc_filters) == len(desired),
+        "auctionEtcOptions": filters,
+        "auctionEtcOptionsResolved": len(filters) == len(desired),
         "auctionOptionsEndpointLoaded": isinstance(auction_options, dict),
     }
+    if payloads:
+        debug["requestPayloadSample"] = payloads[0]
+    if raw_items:
+        debug["rejectedSample"] = _rejected_samples(raw_items, item, desired)
+    return debug
 
 
-def _auction_estimate(
-    client: LostArkClient | None,
-    auction_options: Any,
-    item: EquipmentItem,
-    part: str,
-    request_label: str,
-    search_cache: dict[tuple[Any, ...], list[dict[str, Any]]] | None = None,
-) -> dict[str, Any]:
+def _auction_estimate(client: LostArkClient | None, auction_options: Any, item: EquipmentItem, part: str, request_label: str, search_cache: dict[tuple[Any, ...], list[dict[str, Any]]] | None = None) -> dict[str, Any]:
     desired = _desired_options(item)
     if not desired:
         return _failed_estimate("현재 장신구에서 비교할 핵심 연마 옵션을 찾지 못했습니다.", "auction_option_parse_failed")
@@ -444,14 +454,14 @@ def _auction_estimate(
     if search_cache is None:
         search_cache = {}
     try:
-        raw_items, etc_filters = _search_auction_pages(client, item, part, request_label, desired, auction_options, search_cache)
+        raw_items, filters, payloads = _search_auction_pages(client, item, part, request_label, desired, auction_options, search_cache)
     except Exception:
         return _failed_estimate("경매장 요청에 실패했습니다.", "auction_request_failed")
-    cache_key = _search_cache_key(item, part, request_label, etc_filters)
-    debug = _search_debug(item, part, request_label, cache_key, desired, etc_filters, raw_items, auction_options)
-    if len(etc_filters) != len(desired):
+    key = _search_cache_key(item, part, request_label, filters)
+    debug = _search_debug(item, part, request_label, key, desired, filters, raw_items, payloads, auction_options)
+    if len(filters) != len(desired):
         return _failed_estimate("경매장 핵심 옵션 검색 코드를 찾지 못했습니다.", "auction_option_code_unresolved", debug)
-    prices = _auction_prices(raw_items, item)
+    prices = _auction_prices(raw_items, item, desired)
     if not prices:
         return _failed_estimate("최근 매물 없음", "auction_recent_listing_not_found", debug)
     median = prices[len(prices) // 2]
@@ -463,7 +473,7 @@ def _auction_estimate(
         "medianGold": _gold(median),
         "q75Gold": _gold(q75),
         "sampleCount": len(prices),
-        "sampleType": "lostark_auction_api_core_options_quality10_name_ignored",
+        "sampleType": "lostark_auction_api_core_options_quality10_verified_response_options",
         "status": "ok",
         "failureReason": None,
         "warning": None,
@@ -471,14 +481,7 @@ def _auction_estimate(
     }
 
 
-def _accessory_item(
-    client: LostArkClient | None,
-    auction_options: Any,
-    item: EquipmentItem,
-    official: dict[str, Any] | None,
-    request_label: str,
-    search_cache: dict[tuple[Any, ...], list[dict[str, Any]]],
-) -> dict[str, Any]:
+def _accessory_item(client: LostArkClient | None, auction_options: Any, item: EquipmentItem, official: dict[str, Any] | None, request_label: str, search_cache: dict[tuple[Any, ...], list[dict[str, Any]]]) -> dict[str, Any]:
     part = str((official or {}).get("part") or _part(item.slot))
     targets = (official or {}).get("targetEffects") or []
     matched = (official or {}).get("matchedEffects") or []
@@ -486,7 +489,6 @@ def _accessory_item(
     secondary = sum(1 for row in targets if row.get("isSecondary"))
     estimate = _auction_estimate(client, auction_options, item, part, request_label, search_cache)
     ok = estimate.get("status") == "ok"
-    estimate_warning = estimate.get("warning")
     return {
         "slot": item.slot,
         "marketRequestLabel": request_label,
@@ -503,18 +505,20 @@ def _accessory_item(
         "similarListingEstimate": estimate,
         "matchingConditions": {
             "requestLabel": request_label,
-            "searchCriteriaLabel": "4티어 고대 / 핵심 옵션 2개 / 품질 ±10 / 이름 무관 / 부위별",
+            "searchCriteriaLabel": SEARCH_CRITERIA_LABEL,
             "part": _part_label(part),
             "grade": item.grade or "등급 미상",
             "tier": "T4 추정",
             "qualityTolerance": QUALITY_TOLERANCE,
-            "qualityRange": _quality_range(item.quality, QUALITY_TOLERANCE),
+            "qualityRange": _quality_range(item.quality),
             "itemNameIgnored": True,
+            "strictOptionsOnly": True,
+            "priceFloorApplied": False,
             "coreEffectCount": core,
             "validEffectCount": len(targets),
         },
-        "basis": "lostark_auction_api_core_options_quality10" if ok else "lostark_auction_api_failed_no_fallback",
-        "warning": estimate_warning if ok and estimate_warning else (None if ok else estimate.get("failureReason")),
+        "basis": "lostark_auction_api_core_options_quality10_verified_options" if ok else "lostark_auction_api_failed_no_fallback",
+        "warning": None if ok else estimate.get("failureReason"),
     }
 
 
@@ -592,14 +596,7 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
         client = LostArkClient()
         auction_options = client.get_auction_options(optional=True)
     items = [
-        _accessory_item(
-            client,
-            auction_options,
-            item,
-            official_rows[idx] if idx < len(official_rows) else None,
-            request_labels[idx] if idx < len(request_labels) else f"장신구{idx + 1}",
-            search_cache,
-        )
+        _accessory_item(client, auction_options, item, official_rows[idx] if idx < len(official_rows) else None, request_labels[idx] if idx < len(request_labels) else f"장신구{idx + 1}", search_cache)
         for idx, item in enumerate(accessory_rows)
     ]
     connected_count = sum(1 for row in items if ((row.get("similarListingEstimate") or {}).get("status") == "ok"))
@@ -617,8 +614,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     bracelet_cost = bracelet.get("estimatedActualCostGold") or bracelet.get("expectedReproductionCostGold") or 0
     accessory_median = total.get("medianGold")
     return {
-        "version": "v60.16-auction-core-options-quality10",
-        "source": "lostark_auction_api_core_options_quality10_name_ignored",
+        "version": "v60.17-auction-verified-options-only",
+        "source": "lostark_auction_api_verified_response_options_only",
         "tradeApiConnected": all_prices_ok,
         "auctionApiConnected": connected_count > 0,
         "summary": {
@@ -630,8 +627,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
         "accessoryMarket": {
             "items": items,
             "total": total,
-            "conditions": ["4티어 고대", "핵심 옵션 2개", "품질 ±10", "이름 무관", "부위별", f"상위 {AUCTION_PAGE_LIMIT}페이지"],
-            "basis": "장신구 시장가는 이름을 보지 않고, 부위별로 4티어 고대 등급에서 핵심 옵션 2개와 현재 품질 ±10 범위가 맞는 경매장 즉시구매 매물을 기준으로 산정합니다.",
+            "conditions": ["4티어 고대", "핵심 옵션 2개", "품질 ±10", "이름 무관", "부위별", "응답 Options 직접 검증", f"상위 {AUCTION_PAGE_LIMIT}페이지"],
+            "basis": "검색 표시는 4티어 고대 / 핵심 옵션 2개 / 품질 ±10 / 이름 무관 / 부위별을 유지하되, 가격 후보는 응답 row.Options에서 핵심 옵션 2개가 직접 확인되는 즉시구매 매물만 사용합니다.",
         },
         "braceletMarket": bracelet,
         "separationRule": {
@@ -639,10 +636,10 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
             "luck": "운 판정은 장기백, 스톤 시도 수, 장신구 직접 연마 시도 수, 팔찌 랜덤 옵션 시도 수로 따로 봅니다.",
         },
         "limits": [
-            "검색 기준: 4티어 고대 / 핵심 옵션 2개 / 품질 ±10 / 이름 무관 / 부위별",
+            "검색 기준 표시는 유지: 4티어 고대 / 핵심 옵션 2개 / 품질 ±10 / 이름 무관 / 부위별",
             "ItemName은 검색 payload와 후처리 비교에서 제외합니다.",
-            "핵심 옵션 2개는 /auctions/options에서 찾은 EtcOptions 코드로 /auctions/items 요청에 넣습니다.",
-            "가격 하한 필터는 적용하지 않고, BuyPrice가 있는 매물을 사용합니다.",
+            "가격 하한 필터는 적용하지 않습니다. BuyPrice가 1G라도 핵심 옵션 2개가 Options에서 직접 확인되면 인정합니다.",
+            "Options가 없거나 핵심 옵션 2개가 직접 확인되지 않으면 가격 후보에서 제외합니다.",
             "조건에 맞는 매물이 없으면 장신구 시장가는 최근 매물 없음으로 표시합니다.",
             "입찰가와 시작가는 시장 재현 비용으로 사용하지 않습니다.",
             "팔찌 가격은 후속 연동 대상입니다.",
