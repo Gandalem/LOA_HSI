@@ -269,8 +269,11 @@ def _auction_payload(item: EquipmentItem, part: str, page_no: int = 1) -> dict[s
     return payload
 
 
-def _search_cache_key(item: EquipmentItem, part: str) -> tuple[Any, ...]:
+def _search_cache_key(item: EquipmentItem, part: str, request_label: str) -> tuple[Any, ...]:
+    # 사용자가 보는 장착 슬롯 단위로 별도 API 스캔을 수행합니다.
+    # 예: 목걸이, 귀걸이1, 귀걸이2, 반지1, 반지2.
     return (
+        request_label,
         _auction_category_code(part),
         item.name or "",
         item.grade or "고대",
@@ -299,9 +302,10 @@ def _search_auction_pages(
     client: LostArkClient,
     item: EquipmentItem,
     part: str,
+    request_label: str,
     search_cache: dict[tuple[Any, ...], list[dict[str, Any]]],
 ) -> list[dict[str, Any]]:
-    cache_key = _search_cache_key(item, part)
+    cache_key = _search_cache_key(item, part, request_label)
     if cache_key in search_cache:
         return search_cache[cache_key]
 
@@ -319,6 +323,7 @@ def _search_auction_pages(
 def _auction_estimate(
     item: EquipmentItem,
     part: str,
+    request_label: str,
     search_cache: dict[tuple[Any, ...], list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     desired = _desired_options(item)
@@ -328,37 +333,25 @@ def _auction_estimate(
         return _failed_estimate("경매장 인증 설정이 없어 조회하지 못했습니다.", "auction_missing_auth")
     if search_cache is None:
         search_cache = {}
-    cache_key = _search_cache_key(item, part)
+    cache_key = _search_cache_key(item, part, request_label)
     try:
         client = LostArkClient()
-        raw_items = _search_auction_pages(client, item, part, search_cache)
+        raw_items = _search_auction_pages(client, item, part, request_label, search_cache)
     except Exception:
         return _failed_estimate("경매장 요청에 실패했습니다.", "auction_request_failed")
+    debug = {
+        "requestLabel": request_label,
+        "rawItemCount": len(raw_items),
+        "pageLimit": AUCTION_PAGE_LIMIT,
+        "qualityFloor": _quality_floor(item.quality),
+        "cacheKey": list(cache_key),
+        "desiredOptions": [row.get("raw") for row in desired],
+    }
     if not raw_items:
-        return _failed_estimate(
-            "최근 매물 없음",
-            "auction_recent_listing_not_found",
-            {
-                "rawItemCount": 0,
-                "pageLimit": AUCTION_PAGE_LIMIT,
-                "qualityFloor": _quality_floor(item.quality),
-                "cacheKey": list(cache_key),
-                "desiredOptions": [row.get("raw") for row in desired],
-            },
-        )
+        return _failed_estimate("최근 매물 없음", "auction_recent_listing_not_found", debug)
     prices = _auction_prices(raw_items, item, desired)
     if not prices:
-        return _failed_estimate(
-            "최근 매물 없음",
-            "auction_recent_listing_not_found",
-            {
-                "rawItemCount": len(raw_items),
-                "pageLimit": AUCTION_PAGE_LIMIT,
-                "qualityFloor": _quality_floor(item.quality),
-                "cacheKey": list(cache_key),
-                "desiredOptions": [row.get("raw") for row in desired],
-            },
-        )
+        return _failed_estimate("최근 매물 없음", "auction_recent_listing_not_found", debug)
     median = prices[len(prices) // 2]
     q25 = prices[max(0, len(prices) // 4)]
     q75 = prices[min(len(prices) - 1, (len(prices) * 3) // 4)]
@@ -368,15 +361,17 @@ def _auction_estimate(
         "medianGold": _gold(median),
         "q75Gold": _gold(q75),
         "sampleCount": len(prices),
-        "sampleType": "lostark_auction_api_options_filtered_paged_cached",
+        "sampleType": "lostark_auction_api_per_accessory_paged",
         "status": "ok",
         "failureReason": None,
+        "debug": debug,
     }
 
 
 def _accessory_item(
     item: EquipmentItem,
     official: dict[str, Any] | None,
+    request_label: str,
     search_cache: dict[tuple[Any, ...], list[dict[str, Any]]],
 ) -> dict[str, Any]:
     part = str((official or {}).get("part") or _part(item.slot))
@@ -384,10 +379,11 @@ def _accessory_item(
     matched = (official or {}).get("matchedEffects") or []
     core = sum(1 for row in targets if row.get("isCore"))
     secondary = sum(1 for row in targets if row.get("isSecondary"))
-    estimate = _auction_estimate(item, part, search_cache)
+    estimate = _auction_estimate(item, part, request_label, search_cache)
     ok = estimate.get("status") == "ok"
     return {
         "slot": item.slot,
+        "marketRequestLabel": request_label,
         "name": item.name,
         "part": part,
         "partLabel": _part_label(part),
@@ -400,6 +396,7 @@ def _accessory_item(
         "matchedEffectCount": len(matched),
         "similarListingEstimate": estimate,
         "matchingConditions": {
+            "requestLabel": request_label,
             "part": _part_label(part),
             "grade": item.grade or "등급 미상",
             "tier": "T4 추정",
@@ -407,7 +404,7 @@ def _accessory_item(
             "coreEffectCount": core,
             "validEffectCount": len(targets),
         },
-        "basis": "lostark_auction_api_options_filtered" if ok else "lostark_auction_api_failed_no_fallback",
+        "basis": "lostark_auction_api_per_accessory_paged" if ok else "lostark_auction_api_failed_no_fallback",
         "warning": None if ok else estimate.get("failureReason"),
     }
 
@@ -462,11 +459,33 @@ def _bracelet(character: CharacterSummary, official: dict[str, Any] | None, memo
     }
 
 
+def _accessory_request_labels(accessory_rows: list[EquipmentItem]) -> list[str]:
+    part_counts: dict[str, int] = {}
+    labels: list[str] = []
+    for item in accessory_rows:
+        part = _part(item.slot)
+        label = _part_label(part)
+        part_counts[part] = part_counts.get(part, 0) + 1
+        if part in {"earring", "ring"}:
+            label = f"{label}{part_counts[part]}"
+        labels.append(label)
+    return labels
+
+
 def build_market_cost_summary(character: CharacterSummary, official_accessory: dict[str, Any] | None, official_bracelet: dict[str, Any] | None, memory_hints: dict[str, Any] | None) -> dict[str, Any]:
     accessory_rows = [item for item in character.accessories if item.slot != "팔찌"]
     official_rows = (official_accessory or {}).get("items") or []
+    request_labels = _accessory_request_labels(accessory_rows)
     search_cache: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
-    items = [_accessory_item(item, official_rows[idx] if idx < len(official_rows) else None, search_cache) for idx, item in enumerate(accessory_rows)]
+    items = [
+        _accessory_item(
+            item,
+            official_rows[idx] if idx < len(official_rows) else None,
+            request_labels[idx] if idx < len(request_labels) else f"장신구{idx + 1}",
+            search_cache,
+        )
+        for idx, item in enumerate(accessory_rows)
+    ]
     connected_count = sum(1 for row in items if ((row.get("similarListingEstimate") or {}).get("status") == "ok"))
     all_prices_ok = bool(items) and connected_count == len(items)
     total = {
@@ -482,8 +501,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     bracelet_cost = bracelet.get("estimatedActualCostGold") or bracelet.get("expectedReproductionCostGold") or 0
     accessory_median = total.get("medianGold")
     return {
-        "version": "v60.10-auction-30p-cache-recent-missing",
-        "source": "lostark_auction_api_options_filtered_cached_no_fallback",
+        "version": "v60.11-auction-per-equipped-accessory",
+        "source": "lostark_auction_api_per_equipped_accessory_no_fallback",
         "tradeApiConnected": all_prices_ok,
         "auctionApiConnected": connected_count > 0,
         "summary": {
@@ -495,8 +514,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
         "accessoryMarket": {
             "items": items,
             "total": total,
-            "conditions": ["부위", "등급", "품질 구간", "아이템명", "가격 우선 핵심 Options", f"상위 {AUCTION_PAGE_LIMIT}페이지", "검색 캐시"],
-            "basis": "같은 이름/등급/티어/품질 하한 검색은 한 번만 경매장에 요청하고 캐시를 공유합니다. 이후 가격 우선 핵심 옵션이 일치하는 즉시 구매 매물만 사용합니다.",
+            "conditions": ["목걸이", "귀걸이1", "귀걸이2", "반지1", "반지2", "각 장착 장신구별 별도 API 스캔", f"상위 {AUCTION_PAGE_LIMIT}페이지"],
+            "basis": "장착 중인 각 장신구를 목걸이/귀걸이1/귀걸이2/반지1/반지2 단위로 분리해 /auctions/items를 별도로 조회합니다. 이후 해당 장신구의 가격 우선 핵심 옵션과 일치하는 즉시 구매 매물만 사용합니다.",
         },
         "braceletMarket": bracelet,
         "separationRule": {
@@ -504,9 +523,9 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
             "luck": "운 판정은 장기백, 스톤 시도 수, 장신구 직접 연마 시도 수, 팔찌 랜덤 옵션 시도 수로 따로 봅니다.",
         },
         "limits": [
-            f"장신구는 경매장 상위 {AUCTION_PAGE_LIMIT}페이지 응답 중 가격 우선 핵심 옵션과 일치하는 즉시 구매 매물만 사용합니다.",
-            "검색 캐시 key는 categoryCode + itemName + itemGrade + itemTier + qualityFloor입니다.",
-            "품질은 검색 payload에는 구간 하한을 넣고, 후처리에서는 같은 품질 구간으로 비교합니다.",
+            f"각 장착 장신구는 별도 요청 라벨로 경매장 상위 {AUCTION_PAGE_LIMIT}페이지를 스캔합니다.",
+            "요청 라벨은 목걸이, 귀걸이1, 귀걸이2, 반지1, 반지2입니다.",
+            "같은 이름/등급/품질이라도 장착 슬롯이 다르면 API 스캔 단위를 공유하지 않습니다.",
             "조건에 맞는 매물이 없으면 장신구 시장가는 최근 매물 없음으로 표시합니다.",
             "입찰가, 시작가, 옵션 불일치 매물 가격은 시장 재현 비용으로 사용하지 않습니다.",
             "팔찌 가격은 후속 연동 대상입니다.",
