@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from app.core.settings import get_settings
@@ -69,26 +70,6 @@ def _quality_band(q: int | None) -> str:
     return "70 미만"
 
 
-def _find_numeric(obj: Any, keys: list[str]) -> float | None:
-    if isinstance(obj, dict):
-        for key in keys:
-            if key in obj and obj[key] is not None:
-                try:
-                    return float(str(obj[key]).replace(",", ""))
-                except Exception:
-                    pass
-        for value in obj.values():
-            found = _find_numeric(value, keys)
-            if found is not None:
-                return found
-    elif isinstance(obj, list):
-        for value in obj:
-            found = _find_numeric(value, keys)
-            if found is not None:
-                return found
-    return None
-
-
 def _auction_items(data: Any) -> list[dict[str, Any]]:
     if isinstance(data, dict):
         items = data.get("Items") or data.get("items")
@@ -98,34 +79,128 @@ def _auction_items(data: Any) -> list[dict[str, Any]]:
     return []
 
 
-def _auction_prices(data: Any) -> list[float]:
+def _normalize_name(value: Any) -> str:
+    text = str(value or "")
+    text = text.replace(" ", "")
+    text = text.replace("%", "")
+    text = text.replace("+", "")
+    return text.lower()
+
+
+def _first_number(text: str) -> float | None:
+    match = re.search(r"[+＋-]?(\d+(?:\.\d+)?)", str(text or ""))
+    return float(match.group(1)) if match else None
+
+
+def _desired_option_from_effect(effect: str) -> dict[str, Any] | None:
+    text = str(effect or "")
+    value = _first_number(text)
+    if value is None:
+        return None
+    names = [
+        "적에게 주는 피해",
+        "추가 피해",
+        "치명타 적중률",
+        "치명타 피해",
+        "아군 공격력 강화 효과",
+        "아군 피해량 강화 효과",
+        "무기 공격력",
+        "공격력",
+        "최대 마나",
+        "최대 생명력",
+        "낙인력",
+        "세레나데",
+        "신앙",
+        "조화 게이지",
+    ]
+    for name in names:
+        if name in text:
+            return {"name": name, "value": value, "isPercent": "%" in text, "raw": text}
+    return None
+
+
+def _desired_options(item: EquipmentItem) -> list[dict[str, Any]]:
+    effects = item.accessory_effects or []
+    return [row for row in (_desired_option_from_effect(str(effect)) for effect in effects) if row]
+
+
+def _auction_option_rows(row: dict[str, Any]) -> list[dict[str, Any]]:
+    options = row.get("Options") or row.get("options") or []
+    return [option for option in options if isinstance(option, dict)] if isinstance(options, list) else []
+
+
+def _auction_buy_price(row: dict[str, Any]) -> float | None:
+    info = row.get("AuctionInfo") or row.get("auctionInfo") or {}
+    if not isinstance(info, dict):
+        return None
+    value = info.get("BuyPrice") if "BuyPrice" in info else info.get("buyPrice")
+    try:
+        parsed = float(value)
+        return parsed if parsed > 0 else None
+    except Exception:
+        return None
+
+
+def _same_quality(row: dict[str, Any], quality: int | None) -> bool:
+    if quality is None:
+        return True
+    raw = row.get("GradeQuality") if "GradeQuality" in row else row.get("gradeQuality")
+    try:
+        return int(raw) == int(quality)
+    except Exception:
+        return False
+
+
+def _option_matches(desired: dict[str, Any], option: dict[str, Any]) -> bool:
+    option_name = _normalize_name(option.get("OptionName") or option.get("optionName"))
+    desired_name = _normalize_name(desired.get("name"))
+    if desired_name not in option_name and option_name not in desired_name:
+        return False
+    try:
+        option_value = float(option.get("Value") if "Value" in option else option.get("value"))
+    except Exception:
+        return False
+    if abs(option_value - float(desired["value"])) > 0.001:
+        return False
+    expected_percent = bool(desired.get("isPercent"))
+    actual_percent = bool(option.get("IsValuePercentage") if "IsValuePercentage" in option else option.get("isValuePercentage"))
+    return expected_percent == actual_percent
+
+
+def _auction_item_matches_current_accessory(row: dict[str, Any], item: EquipmentItem, desired: list[dict[str, Any]]) -> bool:
+    if item.name and str(row.get("Name") or row.get("name") or "") != str(item.name):
+        return False
+    if item.grade and str(row.get("Grade") or row.get("grade") or "") != str(item.grade):
+        return False
+    if not _same_quality(row, item.quality):
+        return False
+    options = _auction_option_rows(row)
+    if not desired or not options:
+        return False
+    return all(any(_option_matches(target, option) for option in options) for target in desired)
+
+
+def _auction_prices(data: Any, item: EquipmentItem, desired: list[dict[str, Any]]) -> list[float]:
     prices: list[float] = []
     for row in _auction_items(data):
-        # 시장 재현 비용은 즉시 구매 가능한 매물만 써야 합니다.
-        # 입찰 시작가, 현재 입찰가, 단순 최저가성 필드는 실제 구매 재현 비용이 아니므로 제외합니다.
-        value = _find_numeric(row, ["BuyPrice", "buyPrice"])
-        if value is not None and value > 0:
+        if not _auction_item_matches_current_accessory(row, item, desired):
+            continue
+        value = _auction_buy_price(row)
+        if value is not None:
             prices.append(float(value))
     return sorted(prices)
 
 
 def _auction_payload(item: EquipmentItem, part: str) -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "ItemLevelMin": 0,
-        "ItemLevelMax": 1800,
-        "ItemGradeQuality": int(item.quality or 0),
-        "SkillOptions": [],
-        "EtcOptions": [],
-        "Sort": "BUY_PRICE",
+    # kubrickcode/loa-work와 같은 최소 경매장 검색 형태를 사용합니다.
+    # 세부 옵션은 요청에 넣지 않고, 응답 Items[].Options를 우리 쪽에서 후처리 필터링합니다.
+    return {
         "CategoryCode": _auction_category_code(part),
-        "CharacterClass": "",
-        "ItemTier": 4,
-        "ItemGrade": item.grade or "고대",
         "ItemName": item.name or "",
         "PageNo": 1,
+        "Sort": "BUY_PRICE",
         "SortCondition": "ASC",
     }
-    return {key: value for key, value in payload.items() if value not in (None, "")}
 
 
 def _failed_estimate(reason: str, sample_type: str) -> dict[str, Any]:
@@ -141,15 +216,10 @@ def _failed_estimate(reason: str, sample_type: str) -> dict[str, Any]:
     }
 
 
-def _has_required_option_filters(item: EquipmentItem) -> bool:
-    # 이름/품질만 맞춘 매물은 현재 장신구 옵션 가격이 아닙니다.
-    # Lost Ark 경매장 옵션 코드 매핑이 완성되기 전까지는 가격을 확정하지 않습니다.
-    return False
-
-
 def _auction_estimate(item: EquipmentItem, part: str) -> dict[str, Any]:
-    if not _has_required_option_filters(item):
-        return _failed_estimate("장신구 연마 옵션 필터가 아직 연결되지 않아 가격을 확정하지 않았습니다.", "auction_option_filter_missing")
+    desired = _desired_options(item)
+    if not desired:
+        return _failed_estimate("현재 장신구에서 비교할 연마 옵션을 찾지 못했습니다.", "auction_option_parse_failed")
     if not get_settings().lostark_api_key:
         return _failed_estimate("경매장 인증 설정이 없어 조회하지 못했습니다.", "auction_missing_auth")
     try:
@@ -158,9 +228,9 @@ def _auction_estimate(item: EquipmentItem, part: str) -> dict[str, Any]:
         return _failed_estimate("경매장 요청에 실패했습니다.", "auction_request_failed")
     if data is None:
         return _failed_estimate("경매장 응답이 비어 있습니다.", "auction_empty_response")
-    prices = _auction_prices(data)
+    prices = _auction_prices(data, item, desired)
     if not prices:
-        return _failed_estimate("조건에 맞는 즉시 구매 매물이 없습니다.", "auction_no_buy_listing")
+        return _failed_estimate("현재 장신구 옵션과 일치하는 즉시 구매 매물이 없습니다.", "auction_no_matching_buy_listing")
     median = prices[len(prices) // 2]
     q25 = prices[max(0, len(prices) // 4)]
     q75 = prices[min(len(prices) - 1, (len(prices) * 3) // 4)]
@@ -170,7 +240,7 @@ def _auction_estimate(item: EquipmentItem, part: str) -> dict[str, Any]:
         "medianGold": _gold(median),
         "q75Gold": _gold(q75),
         "sampleCount": len(prices),
-        "sampleType": "lostark_auction_api",
+        "sampleType": "lostark_auction_api_options_filtered",
         "status": "ok",
         "failureReason": None,
     }
@@ -205,7 +275,7 @@ def _accessory_item(item: EquipmentItem, official: dict[str, Any] | None) -> dic
             "coreEffectCount": core,
             "validEffectCount": len(targets),
         },
-        "basis": "lostark_auction_api" if ok else "lostark_auction_api_failed_no_fallback",
+        "basis": "lostark_auction_api_options_filtered" if ok else "lostark_auction_api_failed_no_fallback",
         "warning": None if ok else estimate.get("failureReason"),
     }
 
@@ -279,8 +349,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     bracelet_cost = bracelet.get("estimatedActualCostGold") or bracelet.get("expectedReproductionCostGold") or 0
     accessory_median = total.get("medianGold")
     return {
-        "version": "v60.3-auction-accessory-market-cost-strict",
-        "source": "lostark_auction_api_no_broad_match",
+        "version": "v60.6-auction-accessory-options-filtered",
+        "source": "lostark_auction_api_options_filtered_no_fallback",
         "tradeApiConnected": all_prices_ok,
         "auctionApiConnected": connected_count > 0,
         "summary": {
@@ -292,8 +362,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
         "accessoryMarket": {
             "items": items,
             "total": total,
-            "conditions": ["부위", "등급", "티어", "품질", "연마 옵션"],
-            "basis": "장신구는 연마 옵션까지 정확히 필터링된 경매장 조회값만 사용합니다. 이름/품질만 맞는 넓은 매물 가격은 사용하지 않습니다.",
+            "conditions": ["부위", "등급", "품질", "아이템명", "응답 Options 후처리"],
+            "basis": "경매장을 이름/카테고리 기준으로 조회한 뒤, 응답 Options가 현재 장신구 옵션과 일치하는 즉시 구매 매물만 사용합니다.",
         },
         "braceletMarket": bracelet,
         "separationRule": {
@@ -301,10 +371,9 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
             "luck": "운 판정은 장기백, 스톤 시도 수, 장신구 직접 연마 시도 수, 팔찌 랜덤 옵션 시도 수로 따로 봅니다.",
         },
         "limits": [
-            "장신구는 연마 옵션까지 정확히 필터링된 경매장 조회값만 사용합니다.",
-            "현재 옵션 코드 매핑이 연결되지 않은 장신구는 시장가를 조회 실패로 표시합니다.",
-            "입찰가, 시작가, 이름/품질만 맞는 매물 가격은 시장 재현 비용으로 사용하지 않습니다.",
+            "장신구는 경매장 응답 Options가 현재 장신구 옵션과 일치하는 즉시 구매 매물만 사용합니다.",
+            "조건에 맞는 매물이 없으면 장신구 시장가는 조회 실패로 표시합니다.",
+            "입찰가, 시작가, 옵션 불일치 매물 가격은 시장 재현 비용으로 사용하지 않습니다.",
             "팔찌 가격은 후속 연동 대상입니다.",
-            "운 판정과 시장 구매 비용은 한 점수로 섞지 않습니다.",
         ],
     }
