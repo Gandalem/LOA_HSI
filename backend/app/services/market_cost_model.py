@@ -7,7 +7,9 @@ from app.core.settings import get_settings
 from app.models.schemas import CharacterSummary, EquipmentItem
 from app.services.lostark_client import LostArkClient
 
-AUCTION_PAGE_LIMIT = 30
+# EtcOptions를 요청 payload에 넣으면 API가 이미 옵션을 좁혀주므로 30페이지 스캔은 과합니다.
+# 5개 장신구 x 2단계(±5/±10) x 5페이지 = 최대 50회로 분당 제한 100회 안에 둡니다.
+AUCTION_PAGE_LIMIT = 5
 QUALITY_TOLERANCE_PRIMARY = 5
 QUALITY_TOLERANCE_FALLBACK = 10
 
@@ -203,6 +205,16 @@ def _quality_in_tolerance(row: dict[str, Any], quality: int | None, tolerance: i
         return False
 
 
+def _basic_listing_matches(row: dict[str, Any], item: EquipmentItem, quality_tolerance: int) -> bool:
+    if item.name and str(row.get("Name") or row.get("name") or "") != str(item.name):
+        return False
+    if item.grade and str(row.get("Grade") or row.get("grade") or "") != str(item.grade):
+        return False
+    if not _quality_in_tolerance(row, item.quality, quality_tolerance):
+        return False
+    return True
+
+
 def _option_matches(desired: dict[str, Any], option: dict[str, Any]) -> bool:
     option_name = _normalize_name(option.get("OptionName") or option.get("optionName"))
     desired_name = _normalize_name(desired.get("name"))
@@ -220,11 +232,7 @@ def _option_matches(desired: dict[str, Any], option: dict[str, Any]) -> bool:
 
 
 def _auction_item_matches_current_accessory(row: dict[str, Any], item: EquipmentItem, desired: list[dict[str, Any]], quality_tolerance: int) -> bool:
-    if item.name and str(row.get("Name") or row.get("name") or "") != str(item.name):
-        return False
-    if item.grade and str(row.get("Grade") or row.get("grade") or "") != str(item.grade):
-        return False
-    if not _quality_in_tolerance(row, item.quality, quality_tolerance):
+    if not _basic_listing_matches(row, item, quality_tolerance):
         return False
     options = _auction_option_rows(row)
     if not desired or not options:
@@ -236,6 +244,20 @@ def _auction_prices(items: list[dict[str, Any]], item: EquipmentItem, desired: l
     prices: list[float] = []
     for row in items:
         if not _auction_item_matches_current_accessory(row, item, desired, quality_tolerance):
+            continue
+        value = _auction_buy_price(row)
+        if value is not None:
+            prices.append(float(value))
+    return sorted(prices)
+
+
+def _api_filtered_prices(items: list[dict[str, Any]], item: EquipmentItem, quality_tolerance: int) -> list[float]:
+    # EtcOptions를 payload에 넣은 경우 API가 이미 핵심 옵션을 필터링합니다.
+    # 응답 Options 표기가 프론트 tooltip과 다를 수 있으므로, 후처리 옵션 매칭이 0개일 때만
+    # 이름/등급/품질/즉시구매가 검증 후 API 필터 결과를 참고가로 사용합니다.
+    prices: list[float] = []
+    for row in items:
+        if not _basic_listing_matches(row, item, quality_tolerance):
             continue
         value = _auction_buy_price(row)
         if value is not None:
@@ -431,6 +453,7 @@ def _quality_attempt_debug(
     raw_items: list[dict[str, Any]],
     quality_tolerance: int,
     auction_options: Any,
+    api_filter_only: bool = False,
 ) -> dict[str, Any]:
     return {
         "requestLabel": request_label,
@@ -440,12 +463,22 @@ def _quality_attempt_debug(
         "qualityMin": _quality_min_for_tolerance(item.quality, quality_tolerance),
         "qualityRange": [max(0, int(item.quality or 0) - quality_tolerance), min(100, int(item.quality or 0) + quality_tolerance)] if item.quality is not None else None,
         "qualityFallback": quality_tolerance > QUALITY_TOLERANCE_PRIMARY,
+        "apiFilterOnly": api_filter_only,
         "cacheKey": list(cache_key),
         "desiredOptions": [row.get("raw") for row in desired],
         "auctionEtcOptions": etc_filters,
         "auctionEtcOptionsResolved": len(etc_filters) == len(desired),
         "auctionOptionsEndpointLoaded": isinstance(auction_options, dict),
     }
+
+
+def _estimate_warning(quality_tolerance: int, api_filter_only: bool) -> str | None:
+    parts: list[str] = []
+    if quality_tolerance > QUALITY_TOLERANCE_PRIMARY:
+        parts.append("품질 ±10 보조 참고가")
+    if api_filter_only:
+        parts.append("API 옵션 필터 기준 참고가")
+    return " · ".join(parts) if parts else None
 
 
 def _auction_estimate(
@@ -471,24 +504,34 @@ def _auction_estimate(
         except Exception:
             return _failed_estimate("경매장 요청에 실패했습니다.", "auction_request_failed")
         cache_key = _search_cache_key(item, part, request_label, etc_filters, quality_tolerance)
-        debug = _quality_attempt_debug(item, request_label, cache_key, desired, etc_filters, raw_items, quality_tolerance, auction_options)
-        last_debug = debug
         prices = _auction_prices(raw_items, item, desired, quality_tolerance)
+        api_filter_only = False
+        if not prices and raw_items and len(etc_filters) == len(desired):
+            prices = _api_filtered_prices(raw_items, item, quality_tolerance)
+            api_filter_only = bool(prices)
+        debug = _quality_attempt_debug(item, request_label, cache_key, desired, etc_filters, raw_items, quality_tolerance, auction_options, api_filter_only)
+        last_debug = debug
         if not prices:
             continue
         median = prices[len(prices) // 2]
         q25 = prices[max(0, len(prices) // 4)]
         q75 = prices[min(len(prices) - 1, (len(prices) * 3) // 4)]
+        warning = _estimate_warning(quality_tolerance, api_filter_only)
+        sample_type = "lostark_auction_api_with_etc_options_quality_primary"
+        if quality_tolerance > QUALITY_TOLERANCE_PRIMARY:
+            sample_type = "lostark_auction_api_with_etc_options_quality_fallback"
+        if api_filter_only:
+            sample_type += "_api_filtered"
         return {
             "minGold": _gold(prices[0]),
             "q25Gold": _gold(q25),
             "medianGold": _gold(median),
             "q75Gold": _gold(q75),
             "sampleCount": len(prices),
-            "sampleType": "lostark_auction_api_with_etc_options_quality_fallback" if quality_tolerance > QUALITY_TOLERANCE_PRIMARY else "lostark_auction_api_with_etc_options_quality_primary",
+            "sampleType": sample_type,
             "status": "ok",
             "failureReason": None,
-            "warning": "품질 ±10 보조 참고가" if quality_tolerance > QUALITY_TOLERANCE_PRIMARY else None,
+            "warning": warning,
             "debug": debug,
         }
 
@@ -640,8 +683,8 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     bracelet_cost = bracelet.get("estimatedActualCostGold") or bracelet.get("expectedReproductionCostGold") or 0
     accessory_median = total.get("medianGold")
     return {
-        "version": "v60.13-auction-quality-tolerance-fallback",
-        "source": "lostark_auction_api_etc_options_quality_tolerance_no_fallback",
+        "version": "v60.14-auction-option-filter-limited-pages",
+        "source": "lostark_auction_api_etc_options_limited_pages_no_fallback",
         "tradeApiConnected": all_prices_ok,
         "auctionApiConnected": connected_count > 0,
         "summary": {
@@ -654,7 +697,7 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
             "items": items,
             "total": total,
             "conditions": ["목걸이", "귀걸이1", "귀걸이2", "반지1", "반지2", "EtcOptions 요청 필터", "기본 품질 ±5", "실패 시 품질 ±10 보조", f"상위 {AUCTION_PAGE_LIMIT}페이지"],
-            "basis": "각 장착 장신구별로 EtcOptions를 넣어 검색하고, 본 시장가는 현재 품질 ±5 범위에서 먼저 찾습니다. 없을 때만 ±10 범위를 보조 참고가로 사용합니다.",
+            "basis": "EtcOptions로 옵션을 API 요청 단계에서 먼저 좁히고, 본 시장가는 현재 품질 ±5 범위에서 찾습니다. 없을 때만 ±10 범위를 보조 참고가로 사용합니다. 옵션 필터가 정상 해석된 경우 응답 Options 표기 차이로 후처리 매칭이 0개여도 API 옵션 필터 결과를 참고가로 사용할 수 있습니다.",
         },
         "braceletMarket": bracelet,
         "separationRule": {
@@ -662,11 +705,10 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
             "luck": "운 판정은 장기백, 스톤 시도 수, 장신구 직접 연마 시도 수, 팔찌 랜덤 옵션 시도 수로 따로 봅니다.",
         },
         "limits": [
+            "EtcOptions를 넣은 검색은 최대 5페이지까지만 조회해 API 요청 제한을 피합니다.",
             "본 시장가는 현재 품질 ±5 범위 매물을 우선 사용합니다.",
             "±5 범위에서 매칭 매물이 없을 때만 현재 품질 ±10 범위를 보조 참고가로 사용합니다.",
-            "±10 보조 매물로 산정된 항목은 품질 ±10 보조 참고가로 표시합니다.",
-            "장신구 핵심 옵션은 /auctions/items 요청의 EtcOptions에 포함해 검색합니다.",
-            "응답 Options와 현재 장신구 옵션을 후처리로 한 번 더 검증합니다.",
+            "API 옵션 필터 결과를 참고가로 사용한 경우 API 옵션 필터 기준 참고가로 표시합니다.",
             "조건에 맞는 매물이 없으면 장신구 시장가는 최근 매물 없음으로 표시합니다.",
             "입찰가, 시작가, 옵션 불일치 매물 가격은 시장 재현 비용으로 사용하지 않습니다.",
             "팔찌 가격은 후속 연동 대상입니다.",
