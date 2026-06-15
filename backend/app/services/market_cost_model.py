@@ -210,11 +210,13 @@ def _auction_etc_option_candidates(auction_options: Any) -> list[dict[str, Any]]
             child_text = _option_text(child)
             if second is None:
                 continue
+            values = child.get("EtcValues") or child.get("etcValues") or []
             result.append({
                 "FirstOption": first,
                 "SecondOption": second,
                 "text": f"{parent_text} {child_text}".strip(),
                 "childText": child_text,
+                "values": values if isinstance(values, list) else [],
             })
     return result
 
@@ -247,18 +249,46 @@ def _auction_filter_score(desired: dict[str, Any], candidate: dict[str, Any]) ->
     return score
 
 
+def _number_from_text(value: Any) -> float | None:
+    match = re.search(r"[+＋-]?(\d+(?:\.\d+)?)", str(value or ""))
+    return float(match.group(1)) if match else None
+
+
+def _clean_api_number(value: Any) -> int | float:
+    parsed = float(value)
+    return int(parsed) if parsed.is_integer() else parsed
+
+
+def _auction_filter_api_value(desired: dict[str, Any], candidate: dict[str, Any]) -> int | float:
+    desired_value = float(desired.get("value") or 0)
+    for row in candidate.get("values") or []:
+        if not isinstance(row, dict):
+            continue
+        display_value = _number_from_text(row.get("DisplayValue") if "DisplayValue" in row else row.get("displayValue"))
+        if display_value is not None and abs(display_value - desired_value) <= 0.001:
+            raw = row.get("Value") if "Value" in row else row.get("value")
+            if raw is not None:
+                try:
+                    return _clean_api_number(raw)
+                except Exception:
+                    pass
+    if bool(desired.get("isPercent")):
+        return int(round(desired_value * 100))
+    return _clean_api_number(desired_value)
+
+
 def _auction_etc_filter_for_desired(desired: dict[str, Any], auction_options: Any) -> dict[str, Any] | None:
     scored = [(row, _auction_filter_score(desired, row)) for row in _auction_etc_option_candidates(auction_options)]
     scored = [(row, score) for row, score in scored if score > 0]
     if not scored:
         return None
     candidate = sorted(scored, key=lambda row: row[1], reverse=True)[0][0]
-    value = float(desired.get("value") or 0)
+    api_value = _auction_filter_api_value(desired, candidate)
     return {
         "FirstOption": candidate["FirstOption"],
         "SecondOption": candidate["SecondOption"],
-        "MinValue": value,
-        "MaxValue": value,
+        "MinValue": api_value,
+        "MaxValue": api_value,
     }
 
 
@@ -624,7 +654,7 @@ def build_market_cost_summary(character: CharacterSummary, official_accessory: d
     bracelet_cost = bracelet.get("estimatedActualCostGold") or bracelet.get("expectedReproductionCostGold") or 0
     accessory_median = total.get("medianGold")
     return {
-        "version": "v60.18-auction-quality-helper-fix",
+        "version": "v60.19-auction-etc-api-values",
         "source": "lostark_auction_api_verified_response_options_only",
         "tradeApiConnected": all_prices_ok,
         "auctionApiConnected": connected_count > 0,
