@@ -109,6 +109,10 @@ class LostArkClient:
         # pyLoa의 MarketsEndpoint.search_items도 POST /markets/items를 사용합니다.
         return self._post("/markets/items", json_body=params or {})
 
+    def get_auction_options(self, optional: bool = True) -> Any:
+        # /auctions/items의 EtcOptions 필터 코드는 /auctions/options에서 조회합니다.
+        return self._get("/auctions/options", optional=optional)
+
     def search_auction_items(self, payload: dict[str, Any] | None = None, optional: bool = True) -> Any:
         # 장신구/팔찌/어빌리티 스톤은 거래소가 아니라 경매장(/auctions/items) 검색을 사용합니다.
         # API 키가 없거나 경매장 응답이 실패하면 market cost 모델에서 기존 보정값으로 fallback합니다.
