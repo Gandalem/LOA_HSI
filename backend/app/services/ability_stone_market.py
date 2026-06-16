@@ -8,7 +8,7 @@ from app.services.lostark_client import LostArkClient
 
 ABILITY_STONE_CATEGORY_CODE = 30000
 STONE_AUCTION_PAGE_LIMIT = 5
-VERSION = "v60.22-stone-base-auction-price"
+VERSION = "v60.23-stone-same-positive-engravings"
 
 
 def _gold(value: float | None) -> float | None:
@@ -59,16 +59,28 @@ def _stone_option_names(row: dict[str, Any]) -> list[str]:
     return names
 
 
-def _stone_match_score(row: dict[str, Any], stone: AbilityStoneSummary | None) -> int:
+def _target_positive_names(stone: AbilityStoneSummary | None) -> list[str]:
     if not stone:
-        return 0
+        return []
+    out: list[str] = []
+    for name in (stone.positive_1_name, stone.positive_2_name):
+        clean = str(name or "").strip()
+        if clean and clean not in out:
+            out.append(clean)
+    return out
+
+
+def _stone_match_score(row: dict[str, Any], stone: AbilityStoneSummary | None) -> int:
     names = _stone_option_names(row)
-    score = 0
-    for target in (stone.positive_1_name, stone.positive_2_name):
-        clean = str(target or "").strip()
-        if clean and clean in names:
-            score += 1
-    return score
+    return sum(1 for target in _target_positive_names(stone) if target in names)
+
+
+def _same_positive_engravings(row: dict[str, Any], stone: AbilityStoneSummary | None) -> bool:
+    targets = _target_positive_names(stone)
+    if len(targets) < 2:
+        return False
+    names = _stone_option_names(row)
+    return all(target in names for target in targets)
 
 
 def _payload(stone: AbilityStoneSummary | None, page_no: int, use_name: bool) -> dict[str, Any]:
@@ -134,15 +146,10 @@ def _debug_sample(rows: list[dict[str, Any]], stone: AbilityStoneSummary | None,
     return sample
 
 
-def _fallback_summary(stone: AbilityStoneSummary | None, fallback_price_gold: float, reason: str) -> dict[str, Any]:
+def _summary_base(stone: AbilityStoneSummary | None, fallback_price_gold: float) -> dict[str, Any]:
     return {
         "version": VERSION,
-        "source": "lostark_auction_api_ability_stone_base_item",
-        "status": "failed",
-        "failureReason": reason,
-        "unitPriceGold": _gold(float(fallback_price_gold)),
-        "fallbackApplied": True,
-        "fallbackPriceGold": _gold(float(fallback_price_gold)),
+        "source": "lostark_auction_api_ability_stone_same_positive_engravings",
         "targetStone": None if not stone else {
             "name": stone.name,
             "grade": stone.grade,
@@ -151,9 +158,41 @@ def _fallback_summary(stone: AbilityStoneSummary | None, fallback_price_gold: fl
             "negative": stone.negative_name,
             "stoneType": stone.stone_type,
         },
+        "fallbackPriceGold": _gold(float(fallback_price_gold)),
+    }
+
+
+def _fallback_summary(stone: AbilityStoneSummary | None, fallback_price_gold: float, reason: str, rows: list[dict[str, Any]] | None = None, payloads: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    rows = rows or []
+    payloads = payloads or []
+    base = _summary_base(stone, fallback_price_gold)
+    base.update({
+        "status": "failed",
+        "failureReason": reason,
+        "unitPriceGold": _gold(float(fallback_price_gold)),
+        "fallbackApplied": True,
         "unitPrice": _price_summary([]),
         "matchingMode": "fallback_default",
-    }
+        "matchingConditions": None if not stone else {
+            "categoryCode": ABILITY_STONE_CATEGORY_CODE,
+            "grade": stone.grade or "고대",
+            "tier": 4,
+            "itemNameTried": bool(stone.name),
+            "requiredPositiveEngravings": _target_positive_names(stone),
+            "excludedPenaltyEngraving": stone.negative_name,
+            "pageLimit": STONE_AUCTION_PAGE_LIMIT,
+            "sort": "BUY_PRICE ASC",
+            "strictPositiveEngravingVerification": True,
+        },
+        "debug": {
+            "rawItemCount": len(rows),
+            "matchedItemCount": 0,
+            "requestPayloadSample": payloads[0] if payloads else None,
+            "sampleRows": _debug_sample(rows, stone),
+        },
+        "basis": "Ability stone unit price uses only auction listings whose positive engravings match the character stone. Penalty engravings are ignored/excluded from matching.",
+    })
+    return base
 
 
 def build_ability_stone_market_summary(character: CharacterSummary, fallback_price_gold: float = 5000.0) -> dict[str, Any]:
@@ -168,48 +207,41 @@ def build_ability_stone_market_summary(character: CharacterSummary, fallback_pri
     if not rows:
         rows, payloads = _search_rows(client, stone, use_name=False)
 
-    prices = [price for price in (_auction_buy_price(row) for row in rows) if price is not None]
+    matched_rows = [row for row in rows if _same_positive_engravings(row, stone)]
+    prices = [price for price in (_auction_buy_price(row) for row in matched_rows) if price is not None]
     if not prices:
-        return _fallback_summary(stone, fallback_price_gold, "no recent ability stone listings")
+        return _fallback_summary(stone, fallback_price_gold, "no recent listings with the same positive engravings", rows, payloads)
 
     summary = _price_summary(prices)
     unit_price = summary.get("medianGold") or _gold(float(fallback_price_gold))
-    return {
-        "version": VERSION,
-        "source": "lostark_auction_api_ability_stone_base_item",
+    base = _summary_base(stone, fallback_price_gold)
+    base.update({
         "status": "ok",
         "failureReason": None,
         "unitPriceGold": unit_price,
         "fallbackApplied": False,
-        "fallbackPriceGold": _gold(float(fallback_price_gold)),
-        "targetStone": {
-            "name": stone.name,
-            "grade": stone.grade,
-            "positive1": stone.positive_1_name,
-            "positive2": stone.positive_2_name,
-            "negative": stone.negative_name,
-            "stoneType": stone.stone_type,
-        },
         "unitPrice": summary,
-        "matchingMode": "base_item_name_grade_tier" if payloads and payloads[0].get("ItemName") else "base_category_grade_tier",
+        "matchingMode": "same_positive_engravings_penalty_ignored",
         "matchingConditions": {
             "categoryCode": ABILITY_STONE_CATEGORY_CODE,
             "grade": stone.grade or "고대",
             "tier": 4,
             "itemNameTried": bool(stone.name),
-            "positiveEngravingsObservedOnly": [stone.positive_1_name, stone.positive_2_name],
+            "requiredPositiveEngravings": _target_positive_names(stone),
+            "excludedPenaltyEngraving": stone.negative_name,
             "pageLimit": STONE_AUCTION_PAGE_LIMIT,
             "sort": "BUY_PRICE ASC",
-            "strictEngravingVerification": False,
+            "strictPositiveEngravingVerification": True,
         },
         "debug": {
             "rawItemCount": len(rows),
-            "matchedItemCount": len([row for row in rows if _stone_match_score(row, stone) >= 2]),
+            "matchedItemCount": len(matched_rows),
             "requestPayloadSample": payloads[0] if payloads else None,
             "sampleRows": _debug_sample(rows, stone),
         },
-        "basis": "Ability stone unit price uses the auction buy-price median for the base stone item. Engraving names are shown for debug only and are not required for the unit price.",
-    }
+        "basis": "Ability stone unit price uses the auction buy-price median for listings with the same two positive engravings as the character stone. Penalty engravings are not used for matching.",
+    })
+    return base
 
 
 def stone_market_unit_price(summary: dict[str, Any] | None, fallback_price_gold: float = 5000.0) -> float:
