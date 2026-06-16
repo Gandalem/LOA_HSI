@@ -7,8 +7,8 @@ from app.models.schemas import AbilityStoneSummary, CharacterSummary
 from app.services.lostark_client import LostArkClient
 
 ABILITY_STONE_CATEGORY_CODE = 30000
-STONE_AUCTION_PAGE_LIMIT = 5
-VERSION = "v60.23-stone-same-positive-engravings"
+STONE_AUCTION_PAGE_LIMIT = 20
+VERSION = "v60.24-stone-positive-engraving-filter"
 
 
 def _gold(value: float | None) -> float | None:
@@ -83,17 +83,136 @@ def _same_positive_engravings(row: dict[str, Any], stone: AbilityStoneSummary | 
     return all(target in names for target in targets)
 
 
-def _payload(stone: AbilityStoneSummary | None, page_no: int, use_name: bool) -> dict[str, Any]:
+def _option_code(row: dict[str, Any]) -> int | None:
+    for key in ("Value", "value", "Code", "code", "Id", "id"):
+        if key in row:
+            try:
+                return int(row[key])
+            except Exception:
+                return None
+    return None
+
+
+def _option_text(row: dict[str, Any]) -> str:
+    for key in ("Text", "text", "Name", "name", "OptionName", "optionName"):
+        value = row.get(key)
+        if value not in (None, ""):
+            return str(value)
+    return ""
+
+
+def _option_children(row: dict[str, Any]) -> list[dict[str, Any]]:
+    for key in ("EtcSubs", "etcSubs", "Options", "options", "SubOptions", "subOptions", "Children", "children", "Subs", "subs"):
+        value = row.get(key)
+        if isinstance(value, list):
+            return [child for child in value if isinstance(child, dict)]
+    return []
+
+
+def _norm(text: Any) -> str:
+    return str(text or "").replace(" ", "").replace("[", "").replace("]", "").lower()
+
+
+def _auction_filter_candidates(auction_options: Any) -> list[dict[str, Any]]:
+    if not isinstance(auction_options, dict):
+        return []
+    roots = [
+        ("EtcOptions", "EtcOptions"),
+        ("etcOptions", "EtcOptions"),
+        ("SkillOptions", "SkillOptions"),
+        ("skillOptions", "SkillOptions"),
+    ]
+    candidates: list[dict[str, Any]] = []
+    for source_key, payload_key in roots:
+        groups = auction_options.get(source_key)
+        if not isinstance(groups, list):
+            continue
+        for parent in groups:
+            if not isinstance(parent, dict):
+                continue
+            first = _option_code(parent)
+            parent_text = _option_text(parent)
+            if first is None:
+                continue
+            for child in _option_children(parent):
+                second = _option_code(child)
+                child_text = _option_text(child)
+                if second is None or not child_text:
+                    continue
+                candidates.append({
+                    "payloadKey": payload_key,
+                    "FirstOption": first,
+                    "SecondOption": second,
+                    "text": child_text,
+                    "parentText": parent_text,
+                })
+    return candidates
+
+
+def _find_engraving_filter(name: str, auction_options: Any) -> dict[str, Any] | None:
+    target = _norm(name)
+    if not target:
+        return None
+    scored: list[tuple[int, dict[str, Any]]] = []
+    for candidate in _auction_filter_candidates(auction_options):
+        text = _norm(candidate.get("text"))
+        parent = _norm(candidate.get("parentText"))
+        if text == target:
+            score = 100
+        elif target in text or text in target:
+            score = 70
+        else:
+            continue
+        if "각인" in parent or "engrave" in parent:
+            score += 20
+        scored.append((score, candidate))
+    if not scored:
+        return None
+    best = sorted(scored, key=lambda row: row[0], reverse=True)[0][1]
+    return {
+        "payloadKey": best["payloadKey"],
+        "FirstOption": best["FirstOption"],
+        "SecondOption": best["SecondOption"],
+        "MinValue": 0,
+        "MaxValue": 0,
+        "Text": best.get("text"),
+        "ParentText": best.get("parentText"),
+    }
+
+
+def _resolve_engraving_filters(stone: AbilityStoneSummary | None, auction_options: Any) -> dict[str, Any]:
+    resolved: list[dict[str, Any]] = []
+    unresolved: list[str] = []
+    for name in _target_positive_names(stone):
+        row = _find_engraving_filter(name, auction_options)
+        if row:
+            resolved.append(row)
+        else:
+            unresolved.append(name)
+    payload: dict[str, list[dict[str, Any]]] = {"SkillOptions": [], "EtcOptions": []}
+    for row in resolved:
+        key = row.get("payloadKey") or "EtcOptions"
+        payload.setdefault(str(key), []).append({
+            "FirstOption": row["FirstOption"],
+            "SecondOption": row["SecondOption"],
+            "MinValue": row["MinValue"],
+            "MaxValue": row["MaxValue"],
+        })
+    return {"resolved": resolved, "unresolved": unresolved, "payload": payload}
+
+
+def _payload(stone: AbilityStoneSummary | None, page_no: int, use_name: bool, option_filters: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, Any]:
     grade = stone.grade if stone and stone.grade else "고대"
     name = str(stone.name or "").strip() if stone else ""
+    filters = option_filters or {}
     return {
         "ItemLevelMin": None,
         "ItemLevelMax": None,
         "ItemGradeQuality": None,
         "ItemUpgradeLevel": None,
         "ItemTradeAllowCount": None,
-        "SkillOptions": [],
-        "EtcOptions": [],
+        "SkillOptions": filters.get("SkillOptions") or [],
+        "EtcOptions": filters.get("EtcOptions") or [],
         "Sort": "BUY_PRICE",
         "CategoryCode": ABILITY_STONE_CATEGORY_CODE,
         "CharacterClass": None,
@@ -105,11 +224,11 @@ def _payload(stone: AbilityStoneSummary | None, page_no: int, use_name: bool) ->
     }
 
 
-def _search_rows(client: LostArkClient, stone: AbilityStoneSummary | None, use_name: bool) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _search_rows(client: LostArkClient, stone: AbilityStoneSummary | None, use_name: bool, option_filters: dict[str, list[dict[str, Any]]] | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     rows: list[dict[str, Any]] = []
     payloads: list[dict[str, Any]] = []
     for page_no in range(1, STONE_AUCTION_PAGE_LIMIT + 1):
-        payload = _payload(stone, page_no, use_name)
+        payload = _payload(stone, page_no, use_name, option_filters)
         payloads.append(payload)
         page_items = _auction_items(client.search_auction_items(payload, optional=True))
         if not page_items:
@@ -162,7 +281,7 @@ def _summary_base(stone: AbilityStoneSummary | None, fallback_price_gold: float)
     }
 
 
-def _fallback_summary(stone: AbilityStoneSummary | None, fallback_price_gold: float, reason: str, rows: list[dict[str, Any]] | None = None, payloads: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def _fallback_summary(stone: AbilityStoneSummary | None, fallback_price_gold: float, reason: str, rows: list[dict[str, Any]] | None = None, payloads: list[dict[str, Any]] | None = None, filter_debug: dict[str, Any] | None = None) -> dict[str, Any]:
     rows = rows or []
     payloads = payloads or []
     base = _summary_base(stone, fallback_price_gold)
@@ -188,6 +307,7 @@ def _fallback_summary(stone: AbilityStoneSummary | None, fallback_price_gold: fl
             "rawItemCount": len(rows),
             "matchedItemCount": 0,
             "requestPayloadSample": payloads[0] if payloads else None,
+            "auctionEngravingFilter": filter_debug,
             "sampleRows": _debug_sample(rows, stone),
         },
         "basis": "Ability stone unit price uses only auction listings whose positive engravings match the character stone. Penalty engravings are ignored/excluded from matching.",
@@ -203,14 +323,24 @@ def build_ability_stone_market_summary(character: CharacterSummary, fallback_pri
         return _fallback_summary(stone, fallback_price_gold, "missing lostark api key")
 
     client = LostArkClient()
-    rows, payloads = _search_rows(client, stone, use_name=True)
+    auction_options = client.get_auction_options(optional=True)
+    filter_debug = _resolve_engraving_filters(stone, auction_options)
+    option_filters = filter_debug.get("payload") if not filter_debug.get("unresolved") else None
+
+    rows: list[dict[str, Any]] = []
+    payloads: list[dict[str, Any]] = []
+    if option_filters and (option_filters.get("SkillOptions") or option_filters.get("EtcOptions")):
+        rows, payloads = _search_rows(client, stone, use_name=True, option_filters=option_filters)
+
     if not rows:
-        rows, payloads = _search_rows(client, stone, use_name=False)
+        rows, payloads = _search_rows(client, stone, use_name=True)
+        if not rows:
+            rows, payloads = _search_rows(client, stone, use_name=False)
 
     matched_rows = [row for row in rows if _same_positive_engravings(row, stone)]
     prices = [price for price in (_auction_buy_price(row) for row in matched_rows) if price is not None]
     if not prices:
-        return _fallback_summary(stone, fallback_price_gold, "no recent listings with the same positive engravings", rows, payloads)
+        return _fallback_summary(stone, fallback_price_gold, "no recent listings with the same positive engravings", rows, payloads, filter_debug)
 
     summary = _price_summary(prices)
     unit_price = summary.get("medianGold") or _gold(float(fallback_price_gold))
@@ -221,7 +351,7 @@ def build_ability_stone_market_summary(character: CharacterSummary, fallback_pri
         "unitPriceGold": unit_price,
         "fallbackApplied": False,
         "unitPrice": summary,
-        "matchingMode": "same_positive_engravings_penalty_ignored",
+        "matchingMode": "same_positive_engravings_api_filter" if option_filters else "same_positive_engravings_post_filter",
         "matchingConditions": {
             "categoryCode": ABILITY_STONE_CATEGORY_CODE,
             "grade": stone.grade or "고대",
@@ -237,6 +367,7 @@ def build_ability_stone_market_summary(character: CharacterSummary, fallback_pri
             "rawItemCount": len(rows),
             "matchedItemCount": len(matched_rows),
             "requestPayloadSample": payloads[0] if payloads else None,
+            "auctionEngravingFilter": filter_debug,
             "sampleRows": _debug_sample(rows, stone),
         },
         "basis": "Ability stone unit price uses the auction buy-price median for listings with the same two positive engravings as the character stone. Penalty engravings are not used for matching.",
