@@ -15,11 +15,12 @@ from app.services.accessory_probability import build_official_accessory_effect_s
 from app.services.bracelet_probability import build_official_bracelet_t4_summary
 from app.services.market_cost_model import build_market_cost_summary
 from app.services.ability_stone_market import build_ability_stone_market_summary, stone_market_unit_price
+from app.services.bracelet_market import build_bracelet_fixed_market_summary
 from app.services.dataset_writer import DatasetWriter
 from app.services.class_preset import resolve_class_engraving_preset
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
-MODEL_VERSION = "v60.20-stone-auction-market"
+MODEL_VERSION = "v60.25-bracelet-fixed-effects-auction"
 
 
 def _points_from_stone_type(value: str | None):
@@ -36,6 +37,16 @@ def _attempts_for_at_least_once(probability: float | None, target: float) -> flo
     if not probability or probability <= 0 or probability >= 1:
         return None
     return math.log(1.0 - target) / math.log(1.0 - probability)
+
+
+def _market_gold(value: float | None) -> float | None:
+    if value is None:
+        return None
+    if value >= 10000:
+        return float(round(value / 1000) * 1000)
+    if value >= 1000:
+        return float(round(value / 100) * 100)
+    return float(round(value))
 
 
 def sync_legacy_bracelet_summary(expected_values: dict, official_bracelet: dict | None) -> None:
@@ -97,6 +108,24 @@ def apply_stone_override(character, override):
     return character
 
 
+def apply_bracelet_market_override(expected_values: dict, character, memory_hints: dict | None) -> None:
+    market_cost = expected_values.get("marketCost")
+    if not isinstance(market_cost, dict):
+        return
+    bracelet_market = build_bracelet_fixed_market_summary(
+        character,
+        expected_values.get("officialBraceletT4"),
+        memory_hints,
+    )
+    market_cost["braceletMarket"] = bracelet_market
+    summary = market_cost.setdefault("summary", {})
+    summary["braceletActualGold"] = bracelet_market.get("estimatedActualCostGold")
+    summary["braceletExpectedGold"] = bracelet_market.get("expectedReproductionCostGold")
+    accessory_median = summary.get("accessoryMedianGold")
+    bracelet_cost = bracelet_market.get("estimatedActualCostGold") or bracelet_market.get("expectedReproductionCostGold") or 0
+    summary["marketReproductionGold"] = _market_gold(float(accessory_median) + float(bracelet_cost or 0)) if accessory_median is not None else None
+
+
 @router.post("/compare-character", response_model=CompareResponse)
 def compare_character(req: CompareRequest) -> CompareResponse:
     bundle, raw_path = LostArkClient().get_character_bundle(req.characterName, use_cache=req.useCachedCharacter)
@@ -113,7 +142,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
 
     selected_modules = [m for m in req.compareModules if m in {"equipment", "abilityStone", "accessory"}]
     krw_per_gold = float(req.krwPer100Gold) / 100.0
-    price_fingerprint = f"{engine.material_price_fingerprint}:stone:{ability_stone_unit_price:.0f}:{ability_stone_market.get('status')}"
+    price_fingerprint = f"{engine.material_price_fingerprint}:stone:{ability_stone_unit_price:.0f}:{ability_stone_market.get('status')}:bracelet-fixed-v60.25"
     cache_key = make_cache_key(
         character,
         selected_modules,
@@ -127,8 +156,9 @@ def compare_character(req: CompareRequest) -> CompareResponse:
     assumptions = [
         "캐릭터 API는 현재 결과물만 보여주며 실제 사용 비용은 알 수 없습니다.",
         "장비 재련은 로컬 T4 재련표와 DB 재료 시세를 기준으로 기본 재료/기본 성공확률만 계산합니다.",
-        "어빌리티 스톤은 경매장 즉시구매가로 스톤 1개 단가를 잡고, 목표 활성 레벨 확률의 기대 스톤 개수와 곱합니다.",
+        "어빌리티 스톤은 같은 이름/등급/T4/긍정 각인 2개가 일치하는 경매장 매물의 즉시구매가 median을 단가로 사용합니다. 감소 각인은 비교하지 않습니다.",
         "장신구 효과는 공식 확률표와 매칭한 뒤 중복 제외 보정 기반 기대 시도 수를 계산합니다.",
+        "팔찌 베이스 가격은 현재 팔찌의 고정 효과만 기준으로 4티어 고대 경매장 매물을 조회하고, 응답 Options에서 고정 효과가 직접 확인된 즉시구매 매물 median을 사용합니다.",
         "팔찌 T4는 구매 시 고정 옵션과 랜덤 옵션 슬롯이 섞여 있고 구매 후 계정 귀속되는 구조로 해석합니다.",
         "팔찌 고정/랜덤 슬롯 수는 기본 자동 추정하며, 수동 입력이 있으면 수동 입력을 우선합니다.",
         "기억 기반 보조 판정은 프론트에서 브라우저 localStorage에만 저장할 수 있으며 서버 DB에는 사용자별 기억 기록으로 저장하지 않습니다.",
@@ -194,6 +224,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         expected_values.get("officialBraceletT4"),
         req.memoryHints,
     )
+    apply_bracelet_market_override(expected_values, character, req.memoryHints)
     expected_values["actualCostMode"] = artifact_paths["actualCostMode"]
     expected_values["calculationBasis"] = {
         "official": [
@@ -208,7 +239,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
             "장비 재련표 기반 재현 비용",
             "어빌리티 스톤 경매장 단가 × 목표 달성 기대 스톤 개수",
             "장신구 유사 매물 조건 기반 시장가 추정",
-            "팔찌 베이스 가격 + 팔찌 돌 가격 × 시도 수",
+            "팔찌 고정 효과 기반 경매장 베이스 가격 + 팔찌 돌 가격 × 시도 수",
             "팔찌 옵션 개별 수치 구간은 카테고리 기준으로 표시",
         ],
         "memory": [
