@@ -14,11 +14,12 @@ from app.services.expectation_calculator import build_expected_value_summary
 from app.services.accessory_probability import build_official_accessory_effect_summary
 from app.services.bracelet_probability import build_official_bracelet_t4_summary
 from app.services.market_cost_model import build_market_cost_summary
+from app.services.ability_stone_market import build_ability_stone_market_summary, stone_market_unit_price
 from app.services.dataset_writer import DatasetWriter
 from app.services.class_preset import resolve_class_engraving_preset
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
-MODEL_VERSION = "v60.1-market-cost-calibrated"
+MODEL_VERSION = "v60.20-stone-auction-market"
 
 
 def _points_from_stone_type(value: str | None):
@@ -38,13 +39,7 @@ def _attempts_for_at_least_once(probability: float | None, target: float) -> flo
 
 
 def sync_legacy_bracelet_summary(expected_values: dict, official_bracelet: dict | None) -> None:
-    """Keep old React fields aligned with the v60.1 official bracelet model.
-
-    ResultPanel.jsx still reads expectedValues.braceletT4 in several places. Until that
-    component is fully migrated, copy the official v60.1 random-option expectation into
-    the legacy keys so the visible score and detail text do not use the old 1+ category
-    probability model.
-    """
+    """Keep old React fields aligned with the v60.1 official bracelet model."""
     if not official_bracelet:
         return
     random_basis = official_bracelet.get("randomOptionBasis") or {}
@@ -92,6 +87,7 @@ def apply_stone_override(character, override):
         positive_1_name=override.positive1Name or (old.positive_1_name if old else None) or "각인 1",
         positive_1_points=int(p1),
         positive_2_name=override.positive2Name or (old.positive_2_name if old else None) or "각인 2",
+        positive_2_points=int(p2),
         negative_name=override.negativeName or (old.negative_name if old else None) or "감소",
         negative_points=override.negativePoints,
         stone_type=f"{high}/{low}",
@@ -107,28 +103,32 @@ def compare_character(req: CompareRequest) -> CompareResponse:
     character = build_character_summary(bundle, raw_saved_path=raw_path)
     character.class_engraving_preset = resolve_class_engraving_preset(character, bundle)
     character = apply_stone_override(character, req.stoneOverride)
-    engine = SimulationEngine(use_support_materials=False)
+
+    default_engine = SimulationEngine(use_support_materials=False)
+    default_stone_price = float(default_engine.defaults.get("ability_stone", {}).get("default_stone_price_gold", 5000))
+    ability_stone_market = build_ability_stone_market_summary(character, fallback_price_gold=default_stone_price)
+    ability_stone_unit_price = stone_market_unit_price(ability_stone_market, fallback_price_gold=default_stone_price)
+    engine = SimulationEngine(use_support_materials=False, ability_stone_price_gold=ability_stone_unit_price)
     store = SimulationStore()
 
     selected_modules = [m for m in req.compareModules if m in {"equipment", "abilityStone", "accessory"}]
     krw_per_gold = float(req.krwPer100Gold) / 100.0
+    price_fingerprint = f"{engine.material_price_fingerprint}:stone:{ability_stone_unit_price:.0f}:{ability_stone_market.get('status')}"
     cache_key = make_cache_key(
         character,
         selected_modules,
         req.simulationCount,
         req.seed,
         model_version=MODEL_VERSION,
-        price_fingerprint=engine.material_price_fingerprint,
+        price_fingerprint=price_fingerprint,
     )
     cache_hit = store.exists(cache_key)
 
     assumptions = [
         "캐릭터 API는 현재 결과물만 보여주며 실제 사용 비용은 알 수 없습니다.",
         "장비 재련은 로컬 T4 재련표와 DB 재료 시세를 기준으로 기본 재료/기본 성공확률만 계산합니다.",
-        "어빌리티 스톤은 API로 가져온 현재 활성 레벨 결과를 목표로 보고, 사용자가 기억한 시도 개수와 비교합니다.",
+        "어빌리티 스톤은 경매장 즉시구매가로 스톤 1개 단가를 잡고, 목표 활성 레벨 확률의 기대 스톤 개수와 곱합니다.",
         "장신구 효과는 공식 확률표와 매칭한 뒤 중복 제외 보정 기반 기대 시도 수를 계산합니다.",
-        "v60.1 시장가 모델은 사용자가 확인한 매물 가격대에 맞춰 장신구 유사 매물 비용과 팔찌 베이스+돌 비용을 낮게 보정해 표시합니다.",
-        "v60.1 시장가 모델은 실제 거래소 매물 조회 전 단계의 임시 추정값입니다.",
         "팔찌 T4는 구매 시 고정 옵션과 랜덤 옵션 슬롯이 섞여 있고 구매 후 계정 귀속되는 구조로 해석합니다.",
         "팔찌 고정/랜덤 슬롯 수는 기본 자동 추정하며, 수동 입력이 있으면 수동 입력을 우선합니다.",
         "기억 기반 보조 판정은 프론트에서 브라우저 localStorage에만 저장할 수 있으며 서버 DB에는 사용자별 기억 기록으로 저장하지 않습니다.",
@@ -138,6 +138,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         "팔찌 옵션 개별 수치 구간별 표기확률은 아직 카테고리 기준 확률과 분리해 표시합니다.",
         "실제 사용 골드를 입력받지 않는 기본 모드에서는 유저 비용 percentile 판정보다 재현 비용 분포와 기억 기반 단서를 우선합니다.",
         f"재료 가격 fingerprint: {engine.material_price_fingerprint[:12]}... · DB 시세 {len(engine.material_price_rows)}개 반영",
+        f"어빌리티 스톤 단가: {ability_stone_unit_price:.0f}G ({ability_stone_market.get('matchingMode')})",
     ]
     if cache_hit:
         assumptions.append("이번 결과는 기존 DuckDB 시뮬레이션 캐시를 사용했습니다.")
@@ -169,12 +170,14 @@ def compare_character(req: CompareRequest) -> CompareResponse:
     artifact_paths["materialPriceRows"] = str(len(engine.material_price_rows))
     artifact_paths["modelVersion"] = MODEL_VERSION
     artifact_paths["actualCostMode"] = "not_provided" if total_actual <= 0 else "provided"
+    artifact_paths["abilityStoneUnitPriceGold"] = str(ability_stone_unit_price)
 
     expected_values = build_expected_value_summary(
         character,
-        stone_price_gold=float(engine.defaults.get("ability_stone", {}).get("default_stone_price_gold", 5000)),
+        stone_price_gold=float(ability_stone_unit_price),
         class_preset=character.class_engraving_preset,
     )
+    expected_values["abilityStoneMarket"] = ability_stone_market
     expected_values["officialAccessoryEffects"] = build_official_accessory_effect_summary(
         character,
         class_preset=character.class_engraving_preset,
@@ -203,6 +206,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
         ],
         "estimate": [
             "장비 재련표 기반 재현 비용",
+            "어빌리티 스톤 경매장 단가 × 목표 달성 기대 스톤 개수",
             "장신구 유사 매물 조건 기반 시장가 추정",
             "팔찌 베이스 가격 + 팔찌 돌 가격 × 시도 수",
             "팔찌 옵션 개별 수치 구간은 카테고리 기준으로 표시",
