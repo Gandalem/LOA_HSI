@@ -69,25 +69,24 @@ def support_material_rule(kind: str, base_rate: float) -> dict[str, tuple[int, f
 
 
 def expected_attempts_until_success(rate: float, artisan_gain: float = 3.0) -> float:
-    """Expected number of attempts until success or artisan pity.
-
-    This is a compact local approximation of the refining optimizer logic: compare
-    the expected total gold cost with and without support materials. It accounts for
-    the fact that repeated failures eventually end through artisan energy.
-    """
+    """Expected number of attempts until success or artisan pity."""
     p = max(0.000001, min(1.0, float(rate)))
     gain = max(0.000001, float(artisan_gain))
     pity_attempts = max(1, int(np.ceil(100.0 / gain)))
-    # E[N] for a geometric process truncated by pity: sum P(N >= i).
     return float(sum((1.0 - p) ** i for i in range(pity_attempts)))
 
 
 class SimulationEngine:
-    def __init__(self, use_support_materials: bool = False) -> None:
+    def __init__(self, use_support_materials: bool = False, ability_stone_price_gold: float | None = None) -> None:
         self.settings = get_settings()
         # v27: 보조재료 최적화/자동 적용 제거. 인자는 API 호환성만 유지합니다.
         self.use_support_materials = False
         self.defaults = _load_defaults()
+        self.ability_stone_price_gold = float(
+            ability_stone_price_gold
+            if ability_stone_price_gold is not None and float(ability_stone_price_gold) > 0
+            else self.defaults.get("ability_stone", {}).get("default_stone_price_gold", 5000)
+        )
         self.material_store = MaterialPriceStore()
         self.material_prices_gold = dict(self.defaults.get("equipment", {}).get("material_prices_gold", {}))
         # DB에 수집된 최신 재료 시세가 있으면 기본값 위에 덮어씁니다.
@@ -105,20 +104,15 @@ class SimulationEngine:
         return "weapon" if item.slot == "무기" else "armor"
 
     def _grade_key(self, item: EquipmentItem) -> str | None:
-        # 장비 이름을 먼저 봅니다. 같은 아이템 레벨 1730 근처라도
-        # 에기르 장비와 운명의 전율 장비는 서로 다른 재련표를 사용합니다.
         name = str(item.name or "")
         if "운명의 전율" in name:
             return "t4_1730"
         if "에기르" in name:
             return "t4_1590"
-
-        # 이름 파싱이 실패하면 아이템 레벨로 보조 판단합니다.
         if item.item_level is not None and item.item_level >= 1730:
             return "t4_1730"
         if item.item_level is not None and item.item_level >= 1590:
             return "t4_1590"
-        # If item level parsing fails but honing is in a typical T4 range, use t4_1590 as default.
         if item.honing_level is not None and 11 <= item.honing_level <= 25:
             return "t4_1590"
         return None
@@ -139,12 +133,6 @@ class SimulationEngine:
         return float(attempt_cost) * expected_attempts_until_success(float(success_rate), gain)
 
     def _optimized_support_decision(self, gear_kind: str, base_rate: float, base_attempt_cost: float, artisan_gain: float | None = None) -> dict[str, Any]:
-        """Return support-material optimization data for one honing step.
-
-        `use_support_materials` means the user wants the optimizer to be allowed to
-        use support materials. It does not force wasteful support use; the optimizer
-        applies support materials only when the expected total cost decreases.
-        """
         support_cost, support_bonus, support_amounts = self._support_cost_and_bonus(gear_kind, base_rate)
         missing_support_prices = [key for key in support_amounts if key not in self.material_prices_gold or float(self.material_prices_gold.get(key) or 0) <= 0]
         supported_rate = min(1.0, float(base_rate) + float(support_bonus)) if support_amounts else float(base_rate)
@@ -193,7 +181,6 @@ class SimulationEngine:
         base_rate = float(row["baseProb"])
         base_cost = self._attempt_cost_from_amounts(row.get("amount", {}))
         artisan_gain = float(self.defaults["equipment"].get("artisan_gain_default", 3.0))
-        # 보조재료 최적화 제거: 재련 기대값은 기본 재료 + 골드 + 기본 성공확률 기준입니다.
         return base_rate, base_cost, artisan_gain
 
     def _fallback_rule(self, next_level: int) -> tuple[float, float, float]:
@@ -210,32 +197,24 @@ class SimulationEngine:
         rng = _rng(seed)
         eq_defaults = self.defaults["equipment"]
         costs = np.zeros(n, dtype=np.float64)
-
         gear_items = [x for x in character.equipment if x.honing_level is not None]
         if not gear_items:
-            # If parsing failed, use a conservative synthetic target.
             synthetic = [18, 18, 18, 18, 18, 19]
             for target in synthetic:
                 self._simulate_one_gear(rng, costs, target, int(eq_defaults.get("base_honing_level", 10)), None)
             return costs
-
         for item in gear_items:
             target = int(item.honing_level or 0)
             start = int(eq_defaults.get("base_honing_level", 10))
-            # Icepeng T4 tables start from target 11. If target is lower, nothing to simulate.
             self._simulate_one_gear(rng, costs, target, start, item)
         return costs
 
     def _simulate_one_gear(self, rng: np.random.Generator, costs: np.ndarray, target: int, start: int, item: EquipmentItem | None) -> None:
         for next_level in range(start + 1, target + 1):
-            if item is not None:
-                rule = self._table_rule(item, next_level)
-            else:
-                rule = None
+            rule = self._table_rule(item, next_level) if item is not None else None
             if rule is None:
                 rule = self._fallback_rule(next_level)
             rate, attempt_cost, artisan_gain = rule
-
             artisan = np.zeros(costs.shape[0], dtype=np.float64)
             done = np.zeros(costs.shape[0], dtype=bool)
             safety = 0
@@ -244,7 +223,6 @@ class SimulationEngine:
                 active_count = int(active.sum())
                 costs[active] += attempt_cost
                 success = rng.random(active_count) < rate
-
                 idx = np.where(active)[0]
                 success_idx = idx[success]
                 fail_idx = idx[~success]
@@ -259,7 +237,6 @@ class SimulationEngine:
 
     def _stone_target(self, stone: AbilityStoneSummary | None) -> tuple[int, int]:
         if not stone or stone.positive_1_points is None or stone.positive_2_points is None:
-            # API 표시값 기준 기본 목표: 활성 레벨 2/2.
             return (2, 2)
         high, low = sorted([int(stone.positive_1_points), int(stone.positive_2_points)], reverse=True)
         return high, low
@@ -267,16 +244,13 @@ class SimulationEngine:
     def simulate_stone_cost(self, character: CharacterSummary, n: int, seed: int | None) -> np.ndarray:
         """어빌리티 스톤 비용 분포.
 
-        v21 변경: 한 돌씩 직접 세공 반복을 하지 않고, 공식 자동 세공 구조를
-        DP로 계산한 목표 성공 확률 p를 사용합니다.
-        표시된 1~4 값은 성공 횟수가 아니라 활성 레벨이므로,
-        stone_target_probability에서 활성 레벨을 성공 횟수 기준으로 변환한 뒤 계산합니다.
-        목표 달성까지 필요한 스톤 개수는 기하분포 Geometric(p)를 따르므로 기대값은 1/p입니다.
+        목표 달성까지 필요한 스톤 개수는 기하분포 Geometric(p)를 따르고,
+        스톤 1개 단가는 경매장 기반 가격이 있으면 그 값을 사용합니다.
         """
         rng = _rng(None if seed is None else seed + 11)
         defaults = self.defaults["ability_stone"]
         target_high, target_low = self._stone_target(character.ability_stone)
-        stone_price = float(defaults.get("default_stone_price_gold", 5000))
+        stone_price = float(self.ability_stone_price_gold)
         facet_cost = float(defaults.get("facet_cost_gold", 0))
         per_stone_cost = stone_price + facet_cost
         p = stone_target_probability(int(target_high), int(target_low), None)
@@ -290,7 +264,6 @@ class SimulationEngine:
         defaults = self.defaults["accessory"]
         base_total = float(defaults.get("default_accessory_total_gold", 300000))
         sigma = float(defaults.get("market_variance_sigma", 0.12))
-        # Current accessories are market-cost elements, not pure luck. Use lognormal spread to model market variance.
         if character.accessories:
             qualities = [x.quality for x in character.accessories if x.quality is not None]
             avg_quality = float(np.mean(qualities)) if qualities else 80.0
