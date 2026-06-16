@@ -20,7 +20,7 @@ from app.services.dataset_writer import DatasetWriter
 from app.services.class_preset import resolve_class_engraving_preset
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
-MODEL_VERSION = "v60.25-bracelet-fixed-effects-auction"
+MODEL_VERSION = "v60.26-bracelet-marketcost-version"
 
 
 def _points_from_stone_type(value: str | None):
@@ -117,6 +117,8 @@ def apply_bracelet_market_override(expected_values: dict, character, memory_hint
         expected_values.get("officialBraceletT4"),
         memory_hints,
     )
+    market_cost["version"] = MODEL_VERSION
+    market_cost["source"] = "lostark_auction_api_verified_response_options_and_bracelet_fixed_effects"
     market_cost["braceletMarket"] = bracelet_market
     summary = market_cost.setdefault("summary", {})
     summary["braceletActualGold"] = bracelet_market.get("estimatedActualCostGold")
@@ -124,6 +126,9 @@ def apply_bracelet_market_override(expected_values: dict, character, memory_hint
     accessory_median = summary.get("accessoryMedianGold")
     bracelet_cost = bracelet_market.get("estimatedActualCostGold") or bracelet_market.get("expectedReproductionCostGold") or 0
     summary["marketReproductionGold"] = _market_gold(float(accessory_median) + float(bracelet_cost or 0)) if accessory_median is not None else None
+    limits = [row for row in market_cost.get("limits", []) if "팔찌 가격은 후속 연동 대상" not in str(row)]
+    limits.append("팔찌 베이스 가격은 현재 팔찌의 고정 효과만 기준으로 4티어 고대 경매장 매물을 조회해 산정합니다. 금액 하한 필터는 적용하지 않습니다.")
+    market_cost["limits"] = limits
 
 
 @router.post("/compare-character", response_model=CompareResponse)
@@ -142,7 +147,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
 
     selected_modules = [m for m in req.compareModules if m in {"equipment", "abilityStone", "accessory"}]
     krw_per_gold = float(req.krwPer100Gold) / 100.0
-    price_fingerprint = f"{engine.material_price_fingerprint}:stone:{ability_stone_unit_price:.0f}:{ability_stone_market.get('status')}:bracelet-fixed-v60.25"
+    price_fingerprint = f"{engine.material_price_fingerprint}:stone:{ability_stone_unit_price:.0f}:{ability_stone_market.get('status')}:bracelet-fixed-v60.26"
     cache_key = make_cache_key(
         character,
         selected_modules,
