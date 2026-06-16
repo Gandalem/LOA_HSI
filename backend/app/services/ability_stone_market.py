@@ -8,7 +8,7 @@ from app.services.lostark_client import LostArkClient
 
 ABILITY_STONE_CATEGORY_CODE = 30000
 STONE_AUCTION_PAGE_LIMIT = 5
-VERSION = "v60.21-stone-verified-engravings-only"
+VERSION = "v60.22-stone-base-auction-price"
 
 
 def _gold(value: float | None) -> float | None:
@@ -72,7 +72,7 @@ def _stone_match_score(row: dict[str, Any], stone: AbilityStoneSummary | None) -
 
 
 def _payload(stone: AbilityStoneSummary | None, page_no: int, use_name: bool) -> dict[str, Any]:
-    grade = (stone.grade if stone and stone.grade else "고대")
+    grade = stone.grade if stone and stone.grade else "고대"
     name = str(stone.name or "").strip() if stone else ""
     return {
         "ItemLevelMin": None,
@@ -108,13 +108,7 @@ def _search_rows(client: LostArkClient, stone: AbilityStoneSummary | None, use_n
 
 def _price_summary(prices: list[float]) -> dict[str, Any]:
     if not prices:
-        return {
-            "minGold": None,
-            "q25Gold": None,
-            "medianGold": None,
-            "q75Gold": None,
-            "sampleCount": 0,
-        }
+        return {"minGold": None, "q25Gold": None, "medianGold": None, "q75Gold": None, "sampleCount": 0}
     values = sorted(float(x) for x in prices)
     return {
         "minGold": _gold(values[0]),
@@ -136,17 +130,14 @@ def _debug_sample(rows: list[dict[str, Any]], stone: AbilityStoneSummary | None,
             "buyPrice": info.get("BuyPrice") if isinstance(info, dict) else None,
             "matchScore": _stone_match_score(row, stone),
             "positiveEngravings": _stone_option_names(row),
-            "options": row.get("Options") or row.get("options") or [],
         })
     return sample
 
 
-def _fallback_summary(stone: AbilityStoneSummary | None, fallback_price_gold: float, reason: str, rows: list[dict[str, Any]] | None = None, payloads: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    rows = rows or []
-    payloads = payloads or []
+def _fallback_summary(stone: AbilityStoneSummary | None, fallback_price_gold: float, reason: str) -> dict[str, Any]:
     return {
         "version": VERSION,
-        "source": "lostark_auction_api_ability_stone",
+        "source": "lostark_auction_api_ability_stone_base_item",
         "status": "failed",
         "failureReason": reason,
         "unitPriceGold": _gold(float(fallback_price_gold)),
@@ -162,56 +153,30 @@ def _fallback_summary(stone: AbilityStoneSummary | None, fallback_price_gold: fl
         },
         "unitPrice": _price_summary([]),
         "matchingMode": "fallback_default",
-        "matchingConditions": None if not stone else {
-            "categoryCode": ABILITY_STONE_CATEGORY_CODE,
-            "grade": stone.grade or "고대",
-            "tier": 4,
-            "itemNameTried": bool(stone.name),
-            "positiveEngravings": [stone.positive_1_name, stone.positive_2_name],
-            "pageLimit": STONE_AUCTION_PAGE_LIMIT,
-            "sort": "BUY_PRICE ASC",
-            "strictEngravingVerification": True,
-        },
-        "debug": {
-            "rawItemCount": len(rows),
-            "matchedItemCount": 0,
-            "requestPayloadSample": payloads[0] if payloads else None,
-            "rejectedOrSampleRows": _debug_sample(rows, stone),
-        },
-        "basis": "어빌리티 스톤은 경매장 응답 Options에서 두 긍정 각인이 직접 확인된 매물만 단가로 사용합니다. 확인 매물이 없으면 기본 스톤 가격으로 fallback합니다.",
     }
 
 
 def build_ability_stone_market_summary(character: CharacterSummary, fallback_price_gold: float = 5000.0) -> dict[str, Any]:
     stone = character.ability_stone
     if not stone:
-        return _fallback_summary(None, fallback_price_gold, "조회된 어빌리티 스톤이 없습니다.")
-
+        return _fallback_summary(None, fallback_price_gold, "ability stone not found")
     if not get_settings().lostark_api_key:
-        return _fallback_summary(stone, fallback_price_gold, "경매장 인증 설정이 없어 기본 스톤 가격을 사용합니다.")
+        return _fallback_summary(stone, fallback_price_gold, "missing lostark api key")
 
     client = LostArkClient()
     rows, payloads = _search_rows(client, stone, use_name=True)
     if not rows:
         rows, payloads = _search_rows(client, stone, use_name=False)
 
-    matched_rows = [row for row in rows if _stone_match_score(row, stone) >= 2]
-    matched_prices = [price for price in (_auction_buy_price(row) for row in matched_rows) if price is not None]
+    prices = [price for price in (_auction_buy_price(row) for row in rows) if price is not None]
+    if not prices:
+        return _fallback_summary(stone, fallback_price_gold, "no recent ability stone listings")
 
-    if not matched_prices:
-        return _fallback_summary(
-            stone,
-            fallback_price_gold,
-            "경매장 응답 Options에서 두 긍정 각인이 모두 확인된 최근 매물이 없습니다.",
-            rows,
-            payloads,
-        )
-
-    summary = _price_summary(matched_prices)
+    summary = _price_summary(prices)
     unit_price = summary.get("medianGold") or _gold(float(fallback_price_gold))
     return {
         "version": VERSION,
-        "source": "lostark_auction_api_ability_stone",
+        "source": "lostark_auction_api_ability_stone_base_item",
         "status": "ok",
         "failureReason": None,
         "unitPriceGold": unit_price,
@@ -226,24 +191,24 @@ def build_ability_stone_market_summary(character: CharacterSummary, fallback_pri
             "stoneType": stone.stone_type,
         },
         "unitPrice": summary,
-        "matchingMode": "engraving_options_verified",
+        "matchingMode": "base_item_name_grade_tier" if payloads and payloads[0].get("ItemName") else "base_category_grade_tier",
         "matchingConditions": {
             "categoryCode": ABILITY_STONE_CATEGORY_CODE,
             "grade": stone.grade or "고대",
             "tier": 4,
             "itemNameTried": bool(stone.name),
-            "positiveEngravings": [stone.positive_1_name, stone.positive_2_name],
+            "positiveEngravingsObservedOnly": [stone.positive_1_name, stone.positive_2_name],
             "pageLimit": STONE_AUCTION_PAGE_LIMIT,
             "sort": "BUY_PRICE ASC",
-            "strictEngravingVerification": True,
+            "strictEngravingVerification": False,
         },
         "debug": {
             "rawItemCount": len(rows),
-            "matchedItemCount": len(matched_rows),
+            "matchedItemCount": len([row for row in rows if _stone_match_score(row, stone) >= 2]),
             "requestPayloadSample": payloads[0] if payloads else None,
-            "rejectedOrSampleRows": _debug_sample(rows, stone),
+            "sampleRows": _debug_sample(rows, stone),
         },
-        "basis": "어빌리티 스톤 1개 단가를 경매장 응답 Options에서 두 긍정 각인이 직접 확인된 즉시구매 매물 기준으로 잡고, 목표 스톤 확률의 기대 스톤 개수에 곱합니다.",
+        "basis": "Ability stone unit price uses the auction buy-price median for the base stone item. Engraving names are shown for debug only and are not required for the unit price.",
     }
 
 
