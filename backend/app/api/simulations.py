@@ -1,26 +1,22 @@
 from __future__ import annotations
 
-import math
-
 import numpy as np
 from fastapi import APIRouter
 
 from app.models.schemas import AbilityStoneSummary, CompareRequest, CompareResponse, ModuleCompareResult
 from app.services.character_parser import build_character_summary
+from app.services.class_preset import resolve_class_engraving_preset
+from app.services.comparison_pipeline import (
+    MODEL_VERSION,
+    build_character_expected_values,
+    build_price_fingerprint,
+)
+from app.services.dataset_writer import DatasetWriter
 from app.services.lostark_client import LostArkClient
 from app.services.simulation_engine import SimulationEngine
 from app.services.simulation_store import SimulationStore, make_cache_key
-from app.services.expectation_calculator import build_expected_value_summary
-from app.services.accessory_probability import build_official_accessory_effect_summary
-from app.services.bracelet_probability import build_official_bracelet_t4_summary
-from app.services.market_cost_model import build_market_cost_summary
-from app.services.ability_stone_market import build_ability_stone_market_summary, stone_market_unit_price
-from app.services.bracelet_market import build_bracelet_fixed_market_summary
-from app.services.dataset_writer import DatasetWriter
-from app.services.class_preset import resolve_class_engraving_preset
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
-MODEL_VERSION = "v60.26-bracelet-marketcost-version"
 
 
 def _points_from_stone_type(value: str | None):
@@ -31,52 +27,6 @@ def _points_from_stone_type(value: str | None):
         return int(left), int(right)
     except Exception:
         return None
-
-
-def _attempts_for_at_least_once(probability: float | None, target: float) -> float | None:
-    if not probability or probability <= 0 or probability >= 1:
-        return None
-    return math.log(1.0 - target) / math.log(1.0 - probability)
-
-
-def _market_gold(value: float | None) -> float | None:
-    if value is None:
-        return None
-    if value >= 10000:
-        return float(round(value / 1000) * 1000)
-    if value >= 1000:
-        return float(round(value / 100) * 100)
-    return float(round(value))
-
-
-def sync_legacy_bracelet_summary(expected_values: dict, official_bracelet: dict | None) -> None:
-    """Keep old React fields aligned with the v60.1 official bracelet model."""
-    if not official_bracelet:
-        return
-    random_basis = official_bracelet.get("randomOptionBasis") or {}
-    probability = random_basis.get("weightedSuccessProbability")
-    expected_attempts = random_basis.get("expectedAttempts")
-    if probability is None or expected_attempts is None:
-        return
-
-    legacy = expected_values.setdefault("braceletT4", {})
-    legacy["version"] = "v60.1-legacy-synced-from-officialBraceletT4"
-    legacy["targetProbabilityOneOrMoreValidSpecial"] = probability
-    legacy["expectedAttemptsForValidSpecial"] = expected_attempts
-    legacy["attemptsForAtLeastOnce"] = {
-        "50%": _attempts_for_at_least_once(probability, 0.50),
-        "90%": _attempts_for_at_least_once(probability, 0.90),
-        "99%": _attempts_for_at_least_once(probability, 0.99),
-    }
-    legacy["byAssignedCount"] = random_basis.get("successProbabilityByAssignedCount") or {}
-    legacy["randomOptionBasis"] = random_basis
-    legacy["currentValidEffects"] = [row.get("rawEffect") for row in official_bracelet.get("targetEffects") or [] if row.get("rawEffect")]
-    legacy["currentValidLikeEffects"] = legacy["currentValidEffects"]
-    legacy["currentSecondaryEffects"] = []
-    legacy["currentConditionalEffects"] = []
-    legacy["currentNonCoreEffects"] = [row.get("rawEffect") for row in official_bracelet.get("unmatchedEffects") or [] if row.get("rawEffect")]
-    legacy["formula"] = random_basis.get("formula") or "v60.1 공식 팔찌 랜덤 옵션 기대값을 사용합니다."
-    legacy["rule"] = "v60.1부터 기존 braceletT4 표시값도 officialBraceletT4.randomOptionBasis 기준으로 동기화합니다."
 
 
 def apply_stone_override(character, override):
@@ -108,46 +58,38 @@ def apply_stone_override(character, override):
     return character
 
 
-def apply_bracelet_market_override(expected_values: dict, character, memory_hints: dict | None) -> None:
-    market_cost = expected_values.get("marketCost")
-    if not isinstance(market_cost, dict):
-        return
-    bracelet_market = build_bracelet_fixed_market_summary(
-        character,
-        expected_values.get("officialBraceletT4"),
-        memory_hints,
-    )
-    market_cost["version"] = MODEL_VERSION
-    market_cost["source"] = "lostark_auction_api_verified_response_options_and_bracelet_fixed_effects"
-    market_cost["braceletMarket"] = bracelet_market
-    summary = market_cost.setdefault("summary", {})
-    summary["braceletActualGold"] = bracelet_market.get("estimatedActualCostGold")
-    summary["braceletExpectedGold"] = bracelet_market.get("expectedReproductionCostGold")
-    accessory_median = summary.get("accessoryMedianGold")
-    bracelet_cost = bracelet_market.get("estimatedActualCostGold") or bracelet_market.get("expectedReproductionCostGold") or 0
-    summary["marketReproductionGold"] = _market_gold(float(accessory_median) + float(bracelet_cost or 0)) if accessory_median is not None else None
-    limits = [row for row in market_cost.get("limits", []) if "팔찌 가격은 후속 연동 대상" not in str(row)]
-    limits.append("팔찌 베이스 가격은 현재 팔찌의 고정 효과만 기준으로 4티어 고대 경매장 매물을 조회해 산정합니다. 금액 하한 필터는 적용하지 않습니다.")
-    market_cost["limits"] = limits
-
-
 @router.post("/compare-character", response_model=CompareResponse)
 def compare_character(req: CompareRequest) -> CompareResponse:
-    bundle, raw_path = LostArkClient().get_character_bundle(req.characterName, use_cache=req.useCachedCharacter)
+    bundle, raw_path = LostArkClient().get_character_bundle(
+        req.characterName,
+        use_cache=req.useCachedCharacter,
+    )
     character = build_character_summary(bundle, raw_saved_path=raw_path)
     character.class_engraving_preset = resolve_class_engraving_preset(character, bundle)
     character = apply_stone_override(character, req.stoneOverride)
 
-    default_engine = SimulationEngine(use_support_materials=False)
-    default_stone_price = float(default_engine.defaults.get("ability_stone", {}).get("default_stone_price_gold", 5000))
-    ability_stone_market = build_ability_stone_market_summary(character, fallback_price_gold=default_stone_price)
-    ability_stone_unit_price = stone_market_unit_price(ability_stone_market, fallback_price_gold=default_stone_price)
-    engine = SimulationEngine(use_support_materials=False, ability_stone_price_gold=ability_stone_unit_price)
+    compare_context = build_character_expected_values(character, req.memoryHints)
+    ability_stone_market = compare_context["abilityStoneMarket"]
+    ability_stone_unit_price = float(compare_context["abilityStoneUnitPriceGold"])
+    expected_values = compare_context["expectedValues"]
+
+    engine = SimulationEngine(
+        use_support_materials=False,
+        ability_stone_price_gold=ability_stone_unit_price,
+    )
     store = SimulationStore()
 
-    selected_modules = [m for m in req.compareModules if m in {"equipment", "abilityStone", "accessory"}]
+    selected_modules = [
+        module
+        for module in req.compareModules
+        if module in {"equipment", "abilityStone", "accessory"}
+    ]
     krw_per_gold = float(req.krwPer100Gold) / 100.0
-    price_fingerprint = f"{engine.material_price_fingerprint}:stone:{ability_stone_unit_price:.0f}:{ability_stone_market.get('status')}:bracelet-fixed-v60.26"
+    price_fingerprint = build_price_fingerprint(
+        engine,
+        ability_stone_unit_price,
+        ability_stone_market,
+    )
     cache_key = make_cache_key(
         character,
         selected_modules,
@@ -159,46 +101,81 @@ def compare_character(req: CompareRequest) -> CompareResponse:
     cache_hit = store.exists(cache_key)
 
     assumptions = [
-        "캐릭터 API는 현재 결과물만 보여주며 실제 사용 비용은 알 수 없습니다.",
-        "장비 재련은 로컬 T4 재련표와 DB 재료 시세를 기준으로 기본 재료/기본 성공확률만 계산합니다.",
-        "어빌리티 스톤은 같은 이름/등급/T4/긍정 각인 2개가 일치하는 경매장 매물의 즉시구매가 median을 단가로 사용합니다. 감소 각인은 비교하지 않습니다.",
-        "장신구 효과는 공식 확률표와 매칭한 뒤 중복 제외 보정 기반 기대 시도 수를 계산합니다.",
-        "팔찌 베이스 가격은 현재 팔찌의 고정 효과만 기준으로 4티어 고대 경매장 매물을 조회하고, 응답 Options에서 고정 효과가 직접 확인된 즉시구매 매물 median을 사용합니다.",
-        "팔찌 T4는 구매 시 고정 옵션과 랜덤 옵션 슬롯이 섞여 있고 구매 후 계정 귀속되는 구조로 해석합니다.",
-        "팔찌 고정/랜덤 슬롯 수는 기본 자동 추정하며, 수동 입력이 있으면 수동 입력을 우선합니다.",
-        "기억 기반 보조 판정은 프론트에서 브라우저 localStorage에만 저장할 수 있으며 서버 DB에는 사용자별 기억 기록으로 저장하지 않습니다.",
-        "팔찌 현재 효과 전체를 하나의 랜덤 목표로 계산하지 않고, 직접 돌린 랜덤 옵션 슬롯 기준 기대값만 표시합니다.",
-        "v60.1부터 기존 프론트 braceletT4 표시값도 officialBraceletT4의 필요 카테고리 개수 기준 기대값과 동기화합니다.",
-        "v51부터 리포트 생성 시 캐릭터/장비/장신구/팔찌/스톤/기억 입력을 로컬 Parquet 데이터셋으로 저장합니다.",
-        "팔찌 옵션 개별 수치 구간별 표기확률은 아직 카테고리 기준 확률과 분리해 표시합니다.",
-        "실제 사용 골드를 입력받지 않는 기본 모드에서는 유저 비용 percentile 판정보다 재현 비용 분포와 기억 기반 단서를 우선합니다.",
-        f"재료 가격 fingerprint: {engine.material_price_fingerprint[:12]}... · DB 시세 {len(engine.material_price_rows)}개 반영",
+        "캐릭터 API는 현재 결과물만 보여주며 실제 사용 비용은 포함하지 않습니다.",
+        "장비 재련은 로컬 T4 재련표와 저장된 재료 시세 기준으로 계산합니다.",
+        "어빌리티 스톤은 같은 이름/등급/T4/긍정 각인 2개 일치 매물 기준으로 봅니다. 감소 각인은 비교하지 않습니다.",
+        "장신구는 공식 옵션 확률표와 응답 Options 직접 검증 기준으로 계산합니다.",
+        "팔찌 베이스 가격은 현재 팔찌의 고정 효과만 기준으로 4티어 고대 경매장 매물을 조회합니다.",
+        "팔찌 랜덤 옵션은 고정 옵션과 분리해서 공식 확률표 기준으로 계산합니다.",
+        "기억 기반 실제 비용 입력은 브라우저 localStorage 기준이며 서버 공용 데이터로 자동 저장하지 않습니다.",
+        "실제 비용 미입력 모드에서는 운 수치보다 재현 비용 분포와 기억 기반 단서를 우선 표시합니다.",
+        f"재료 가격 fingerprint: {engine.material_price_fingerprint[:12]}... / rows={len(engine.material_price_rows)}",
         f"어빌리티 스톤 단가: {ability_stone_unit_price:.0f}G ({ability_stone_market.get('matchingMode')})",
     ]
-    if cache_hit:
-        assumptions.append("이번 결과는 기존 DuckDB 시뮬레이션 캐시를 사용했습니다.")
-    else:
-        assumptions.append("이번 결과는 새로 시뮬레이션한 뒤 DuckDB에 저장했습니다.")
+    assumptions.append(
+        "기존 DuckDB 시뮬레이션 캐시를 사용했습니다."
+        if cache_hit
+        else "새 DuckDB 시뮬레이션 캐시를 생성했습니다."
+    )
 
     if not cache_hit:
         module_values: dict[str, np.ndarray] = {}
         if "equipment" in selected_modules:
-            module_values["equipment"] = engine.simulate_equipment_cost(character, req.simulationCount, req.seed)
+            module_values["equipment"] = engine.simulate_equipment_cost(
+                character,
+                req.simulationCount,
+                req.seed,
+            )
         if "abilityStone" in selected_modules:
-            module_values["abilityStone"] = engine.simulate_stone_cost(character, req.simulationCount, req.seed)
+            module_values["abilityStone"] = engine.simulate_stone_cost(
+                character,
+                req.simulationCount,
+                req.seed,
+            )
         if "accessory" in selected_modules:
-            module_values["accessory"] = engine.simulate_accessory_cost(character, req.simulationCount, req.seed)
-        store.save(cache_key, character.character_name, selected_modules, req.simulationCount, req.seed, module_values, model_version=MODEL_VERSION)
+            module_values["accessory"] = engine.simulate_accessory_cost(
+                character,
+                req.simulationCount,
+                req.seed,
+            )
+        store.save(
+            cache_key,
+            character.character_name,
+            selected_modules,
+            req.simulationCount,
+            req.seed,
+            module_values,
+            model_version=MODEL_VERSION,
+        )
 
     modules: dict[str, ModuleCompareResult] = {}
     if "equipment" in selected_modules:
-        modules["equipment"] = store.build_module_result(cache_key, "equipment", req.actualCostGold.equipment, krw_per_gold)
+        modules["equipment"] = store.build_module_result(
+            cache_key,
+            "equipment",
+            req.actualCostGold.equipment,
+            krw_per_gold,
+        )
     if "abilityStone" in selected_modules:
-        modules["abilityStone"] = store.build_module_result(cache_key, "abilityStone", req.actualCostGold.abilityStone, krw_per_gold)
+        modules["abilityStone"] = store.build_module_result(
+            cache_key,
+            "abilityStone",
+            req.actualCostGold.abilityStone,
+            krw_per_gold,
+        )
     if "accessory" in selected_modules:
-        modules["accessory"] = store.build_module_result(cache_key, "accessory", req.actualCostGold.accessory, krw_per_gold)
+        modules["accessory"] = store.build_module_result(
+            cache_key,
+            "accessory",
+            req.actualCostGold.accessory,
+            krw_per_gold,
+        )
 
-    total_actual = req.actualCostGold.equipment + req.actualCostGold.abilityStone + req.actualCostGold.accessory
+    total_actual = (
+        req.actualCostGold.equipment
+        + req.actualCostGold.abilityStone
+        + req.actualCostGold.accessory
+    )
     total = store.build_module_result(cache_key, "total", total_actual, krw_per_gold)
     artifact_paths = store.artifact_paths(cache_key)
     artifact_paths["materialPriceFingerprint"] = engine.material_price_fingerprint
@@ -207,44 +184,21 @@ def compare_character(req: CompareRequest) -> CompareResponse:
     artifact_paths["actualCostMode"] = "not_provided" if total_actual <= 0 else "provided"
     artifact_paths["abilityStoneUnitPriceGold"] = str(ability_stone_unit_price)
 
-    expected_values = build_expected_value_summary(
-        character,
-        stone_price_gold=float(ability_stone_unit_price),
-        class_preset=character.class_engraving_preset,
-    )
-    expected_values["abilityStoneMarket"] = ability_stone_market
-    expected_values["officialAccessoryEffects"] = build_official_accessory_effect_summary(
-        character,
-        class_preset=character.class_engraving_preset,
-    )
-    expected_values["officialBraceletT4"] = build_official_bracelet_t4_summary(
-        character,
-        class_preset=character.class_engraving_preset,
-        memory_hints=req.memoryHints,
-    )
-    sync_legacy_bracelet_summary(expected_values, expected_values.get("officialBraceletT4"))
-    expected_values["marketCost"] = build_market_cost_summary(
-        character,
-        expected_values.get("officialAccessoryEffects"),
-        expected_values.get("officialBraceletT4"),
-        req.memoryHints,
-    )
-    apply_bracelet_market_override(expected_values, character, req.memoryHints)
     expected_values["actualCostMode"] = artifact_paths["actualCostMode"]
     expected_values["calculationBasis"] = {
         "official": [
             "장신구 효과 공식 확률표 매칭",
             "장신구 중복 제외 보정 기대 시도 수",
-            "팔찌 T4 효과 개수 확률",
-            "팔찌 T4 고정 옵션/랜덤 옵션 슬롯 자동 추정",
+            "팔찌 T4 효과 개수 확률표",
+            "팔찌 T4 고정/랜덤 옵션 분리 추정",
             "팔찌 T4 수동 입력 우선 적용",
             "스톤 활성 레벨-성공 횟수 변환",
         ],
         "estimate": [
-            "장비 재련표 기반 재현 비용",
-            "어빌리티 스톤 경매장 단가 × 목표 달성 기대 스톤 개수",
+            "장비 재련 재료 기반 재현 비용",
+            "어빌리티 스톤 경매장 단가 기반 기대 스톤 개수",
             "장신구 유사 매물 조건 기반 시장가 추정",
-            "팔찌 고정 효과 기반 경매장 베이스 가격 + 팔찌 돌 가격 × 시도 수",
+            "팔찌 고정 효과 기반 경매장 베이스 가격 + 랜덤 옵션 기대 시도",
             "팔찌 옵션 개별 수치 구간은 카테고리 기준으로 표시",
         ],
         "memory": [
@@ -254,7 +208,7 @@ def compare_character(req: CompareRequest) -> CompareResponse:
             "팔찌 랜덤 옵션 시도 수",
             "팔찌 고정 옵션 수",
             "팔찌 랜덤 슬롯 수",
-            "브라우저 localStorage 저장/불러오기",
+            "브라우저 localStorage 불러오기",
         ],
     }
 

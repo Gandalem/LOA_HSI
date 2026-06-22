@@ -1,13 +1,11 @@
-FROM node:20-alpine AS build
+FROM node:20-bookworm-slim AS build
 WORKDIR /app/frontend
 
-COPY package.json ./
-RUN npm config set registry https://registry.npmjs.org/ \
-    && npm install --no-audit --no-fund
-
+COPY package.json ./package.json
 COPY index.html ./index.html
-COPY vite.config.js ./vite.config.js
+COPY scripts ./scripts
 COPY src ./src
+COPY node_modules ./node_modules
 RUN npm run build \
     && test -f /app/frontend/dist/index.html \
     && grep -q "id=\"root\"" /app/frontend/dist/index.html \

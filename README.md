@@ -112,3 +112,8 @@ docker compose up -d --build --force-recreate
 ```env
 LOSTARK_API_KEY=your_lostark_jwt
 ```
+
+## Batch Docs
+
+- `docs/ARMORY_NORMALIZED_EXTRACTOR.md`: armory raw -> normalized parquet/ndjson
+- `docs/ARMORY_COMPARISON_BATCH.md`: normalized parquet -> market/simulation comparison batch

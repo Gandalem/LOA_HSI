@@ -56,6 +56,17 @@ export function compareCharacter(payload) {
   });
 }
 
+export function compareCharacterCohort(payload) {
+  return request('/comparisons/cohort-compare', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function getCohortDatasetStatus() {
+  return request('/comparisons/cohort-status');
+}
+
 
 export function getLatestMaterialPrices() {
   return request('/material-prices/latest');

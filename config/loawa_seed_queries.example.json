@@ -1,0 +1,52 @@
+{
+  "version": "v2",
+  "notes": [
+    "이 설정은 캐릭터 이름 seed 수집용이다.",
+    "실제 캐릭터 상세 데이터는 이후 공식 Lost Ark API로 검증 및 수집한다.",
+    "현재 기본 seed 소스는 KLOA 전투력 랭킹이며, 더 보기 버튼을 반복 클릭하는 방식이다."
+  ],
+  "sources": [
+    {
+      "sourceType": "kloa_combat_power",
+      "baseUrl": "https://kloa.gg",
+      "path": "/ranking/combat-power",
+      "startUrls": [
+        "https://kloa.gg/ranking/combat-power"
+      ],
+      "enabled": true,
+      "weight": 1.0,
+      "actionMode": "load_more",
+      "loadMoreSelectors": [
+        "button:has-text('더 보기')",
+        "text=더 보기"
+      ],
+      "nameSelectors": [
+        "a[href^='/characters/']",
+        "a[href*='/characters/']"
+      ],
+      "filters": {
+        "pagesPerQuery": 50
+      }
+    },
+    {
+      "sourceType": "loawa_combatpower_legacy",
+      "baseUrl": "https://loawa.com",
+      "path": "/rank/combatpower",
+      "startUrls": [
+        "https://loawa.com/rank/combatpower"
+      ],
+      "enabled": false,
+      "weight": 0.0,
+      "actionMode": "scroll",
+      "nextPageSelectors": [
+        "a[rel='next']",
+        "button[rel='next']",
+        "a:has-text('다음')",
+        "button:has-text('다음')"
+      ],
+      "filters": {
+        "pagesPerQuery": 20
+      }
+    }
+  ]
+}

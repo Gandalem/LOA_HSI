@@ -72,7 +72,7 @@ class SimulationStore:
         self.settings = get_settings()
         self.db_dir = self.settings.data_dir / "db"
         self.db_dir.mkdir(parents=True, exist_ok=True)
-        self.db_path = self.db_dir / "loa_hsi.duckdb"
+        self.db_path = self.db_dir / self.settings.simulation_store_db_name
         self._init_db()
 
     def _connect(self) -> duckdb.DuckDBPyConnection:

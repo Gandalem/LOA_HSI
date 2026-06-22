@@ -1,0 +1,13 @@
+{
+  "name": "loa-hsi-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "collect:loawa": "node collect_loawa_seeds.mjs",
+    "verify:loawa": "node verify_loawa_seeds_api.mjs",
+    "collect:armory": "node collect_seed_armory_bundle.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.53.2"
+  }
+}

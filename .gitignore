@@ -16,3 +16,16 @@ venv/
 
 .DS_Store
 Thumbs.dbs
+
+# Local data artifacts
+data/cache/
+data/raw/
+data/processed/
+data/parquet/
+data/db/
+
+# Local browser/runtime scratch
+.tmp/
+
+# Local database files
+*.duckdb

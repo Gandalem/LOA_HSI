@@ -2,12 +2,10 @@
 .footer-notice-panel,
 .auto-price-status,
 .material-chip-row,
-.price-actions .ghost,
 .numeric-memory-grid label:has(select option[value="10000"]),
 .pity-record-panel > .hint,
 .accessory-acquisition-panel > div > .hint,
-.memory-panel > div:first-child .hint,
-.module-toggle small {
+.memory-panel > div:first-child .hint {
   display: none !important;
 }
 
