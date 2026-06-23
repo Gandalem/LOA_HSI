@@ -5,8 +5,9 @@ COPY package.json ./package.json
 COPY index.html ./index.html
 COPY scripts ./scripts
 COPY src ./src
-COPY node_modules ./node_modules
-RUN npm run build \
+RUN npm config set registry https://registry.npmjs.org/ \
+    && npm install --no-audit --no-fund --package-lock=false \
+    && npm run build \
     && test -f /app/frontend/dist/index.html \
     && grep -q "id=\"root\"" /app/frontend/dist/index.html \
     && ls -la /app/frontend/dist
